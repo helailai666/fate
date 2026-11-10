@@ -1,8 +1,9 @@
-﻿package repository
+package repository
 
 import (
 	"context"
 	"crypto/md5"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"strconv"
@@ -14,6 +15,19 @@ import (
 type Repository struct {
 	*ent.Client
 	cache *ModelCache
+	// rawDB provides direct SQL access for poetry queries that need joins
+	// the ORM cannot express efficiently. May be nil (poetry disabled).
+	rawDB *sql.DB
+}
+
+// SetRawDB attaches a raw database handle used by poetry queries.
+func (m *Repository) SetRawDB(db *sql.DB) {
+	m.rawDB = db
+}
+
+// RawDB returns the raw database handle, or nil when not configured.
+func (m *Repository) RawDB() *sql.DB {
+	return m.rawDB
 }
 
 func (m *Repository) Initialize(ctx context.Context) error {
@@ -122,4 +136,3 @@ func (m *Repository) QueryPoetryChars(ctx context.Context) ([]string, error) {
 	}
 	return chars, nil
 }
-

@@ -8,6 +8,9 @@ import (
 //go:embed character.json
 var CharacterJSON []byte
 
+//go:embed name_aesthetic.json
+var NameAestheticJSON []byte
+
 //go:embed all:static
 var staticFS embed.FS
 

@@ -40,3 +40,5 @@ Only character.json (in `resources/`) is essential.
 - Requires `data/chinese-poetry/` directory
 - Server gracefully degrades if absent (poetry search returns empty)
 - Run `python3 data/download/chinese_poetry.py` to download the dataset
+- Import with `go run ./cmd/seeddb -db fate -poetry data/chinese-poetry`
+  (creates poem/poem_char tables and backfills character.has_poetry)

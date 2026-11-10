@@ -180,10 +180,14 @@ go build -o fate ./cmd/console
 |--------|----------|------|
 | `GET` | `/health` | 健康检查 |
 | `POST` | `/api/generate` | 异步生成名字（返回 task_id） |
-| `GET` | `/api/task/:id` | 查询任务状态 |
-| `GET` | `/api/names/:taskId` | 分页获取名字列表 |
-| `GET` | `/api/name-detail` | 名字详细分析 |
-| `GET` | `/api/explore/:taskId` | 随机探索名字 |
+| `GET` | `/api/generate/status?task_id=` | 查询任务状态 |
+| `GET` | `/api/generate/result?task_id=` | 任务结果（推荐名字） |
+| `GET` | `/api/generate/names?task_id=&page=&size=` | 分页获取名字列表 |
+| `GET` | `/api/name-detail?task_id=&char1=&char2=` | 名字详细分析 |
+| `GET` | `/api/generate/explore?task_id=` | 随机探索名字 |
+| `POST` | `/api/name-score` | 姓名测分 |
+| `GET` | `/api/poetry/search?keyword=&type=&dynasty=&page=&size=` | 诗词搜索（需导入诗词数据） |
+| `GET` | `/api/v1/characters?char=` | 汉字信息查询 |
 
 ### 生成请求示例
 
@@ -198,6 +202,20 @@ curl -X POST http://localhost:18080/api/generate \
     "avoid_chars": ["病", "死"]
   }'
 ```
+
+### 诗词取名数据（可选）
+
+诗词取名功能依赖诗词数据（`poem`/`poem_char` 表）：
+
+```bash
+# 1. 下载数据集（约 354MB，来源 chinese-poetry）
+python3 data/download/chinese_poetry.py
+
+# 2. 导入数据库（创建 poem/poem_char 表并回填 character.has_poetry）
+go run ./cmd/seeddb -db fate -poetry data/chinese-poetry
+```
+
+未导入时服务器正常降级：`/api/poetry/search` 返回空结果，`poetry_mode=1/2` 无诗词加成。
 
 ---
 

@@ -176,13 +176,29 @@ export interface NameScoreRequest {
 }
 
 export interface PoetrySearchResult {
+  char?: string
+  poem_id?: number
   title: string
   author: string
   dynasty: string
   type: string
   sentence: string
+  context?: string
 }
 
 export interface PoetrySearchResponse {
   results: PoetrySearchResult[]
+  total: number
+  page: number
+  size: number
+  poetry_available: boolean
+}
+
+export interface PoetrySearchParams {
+  keyword?: string
+  author?: string
+  dynasty?: string
+  type?: string
+  page?: number
+  size?: number
 }

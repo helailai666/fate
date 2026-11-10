@@ -1,23 +1,26 @@
-﻿package rating
+package rating
 
 import (
 	"fmt"
 	"math"
 	"strings"
 
-	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/ent"
+	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/internal/wuge"
 	"github.com/babyname/fate/v4/internal/wuxing"
 )
 
 type NameRating struct {
-	WenHuaScore     float64
-	WuXingScore     float64
-	ShengXiaoScore  float64
-	WuGeScore       float64
-	YinYunScore     float64
-	TotalScore      float64
+	WenHuaScore    float64
+	WuXingScore    float64
+	ShengXiaoScore float64
+	WuGeScore      float64
+	YinYunScore    float64
+	TotalScore     float64
+	// SemanticScore is the combined semantic (aesthetic) quality of the name
+	// characters; used for ranking tie-breaks.
+	SemanticScore   float64
 	Grade           string
 	Interpret       string
 	WenHuaDetail    string
@@ -28,17 +31,25 @@ type NameRating struct {
 }
 
 type Rater struct {
-	fateData *chronosfate.FateData
-	l1       int
-	l2       int
+	fateData      *chronosfate.FateData
+	l1            int
+	l2            int
+	surnamePinyin string
+	aesthetic     *Aesthetic
 }
 
 func NewRater(fateData *chronosfate.FateData) *Rater {
-	return &Rater{fateData: fateData}
+	return &Rater{fateData: fateData, aesthetic: NewAesthetic()}
 }
 
 func NewRaterWithStrokes(fateData *chronosfate.FateData, l1, l2 int) *Rater {
-	return &Rater{fateData: fateData, l1: l1, l2: l2}
+	return &Rater{fateData: fateData, l1: l1, l2: l2, aesthetic: NewAesthetic()}
+}
+
+// SetSurnamePinyin sets the surname's pinyin (tone-marked, first reading) so
+// that yin-yun scoring can evaluate the full three-syllable name.
+func (r *Rater) SetSurnamePinyin(p string) {
+	r.surnamePinyin = p
 }
 
 func (r *Rater) RateName(surname string, c1, c2 *ent.Character) *NameRating {
@@ -49,11 +60,14 @@ func (r *Rater) RateName(surname string, c1, c2 *ent.Character) *NameRating {
 	r.rateShengXiao(rating, c1, c2)
 	r.rateWuGe(rating, c1, c2)
 	r.rateYinYun(rating, c1, c2)
+	rating.SemanticScore = r.SemanticSum(c1, c2)
 
-	wenHuaWeight := 0.20
-	wuXingWeight := 0.25
-	shengXiaoWeight := 0.10
-	wuGeWeight := 0.30
+	// Aesthetics dominate: cultural/semantic 0.35, wuge 0.22, wuxing 0.22,
+	// shengxiao 0.06, yinyun 0.15.
+	wenHuaWeight := 0.35
+	wuXingWeight := 0.22
+	shengXiaoWeight := 0.06
+	wuGeWeight := 0.22
 	yinYunWeight := 0.15
 
 	rating.TotalScore = math.Round(
@@ -70,52 +84,60 @@ func (r *Rater) RateName(surname string, c1, c2 *ent.Character) *NameRating {
 	return rating
 }
 
+// SemanticSum returns the combined semantic score of the two name characters.
+// Used as a tie-breaker during candidate ranking.
+func (r *Rater) SemanticSum(c1, c2 *ent.Character) float64 {
+	s1, _ := r.aesthetic.SemanticScoreCached(c1)
+	s2, _ := r.aesthetic.SemanticScoreCached(c2)
+	return s1 + s2
+}
+
+// rateWenHua scores the cultural impression of a name. The semantic quality
+// of the characters (beauty/vulgarity of meaning) dominates; structural
+// traits (strokes, common usage) are secondary refinements.
 func (r *Rater) rateWenHua(rating *NameRating, c1, c2 *ent.Character) {
-	score := 60.0
+	// Semantic-first base: a neutral structural name starts mid-scale so the
+	// semantic delta can truly separate beautiful from ugly names.
+	score := 40.0
 	var details []string
 
+	s1, reason1 := r.aesthetic.SemanticScoreCached(c1)
+	s2, reason2 := r.aesthetic.SemanticScoreCached(c2)
+	score += s1 + s2
+	if reason1 != "" {
+		details = append(details, reason1)
+	}
+	if reason2 != "" {
+		details = append(details, reason2)
+	}
+
 	if c1.Regular && c1.Nameable {
-		score += 5
+		score += 4
 		details = append(details, fmt.Sprintf("【%s】为常用起名用字", c1.Char))
 	} else if c1.Regular {
 		score += 2
 	}
 	if c2.Regular && c2.Nameable {
-		score += 5
+		score += 4
 		details = append(details, fmt.Sprintf("【%s】为常用起名用字", c2.Char))
 	} else if c2.Regular {
 		score += 2
 	}
 
-	if c1.CommonLevel > 0 && c1.CommonLevel <= 2 {
-		score += 3
-		details = append(details, fmt.Sprintf("【%s】常用度高", c1.Char))
-	} else if c1.CommonLevel == 3 {
-		score += 1
-	}
-	if c2.CommonLevel > 0 && c2.CommonLevel <= 2 {
-		score += 3
-		details = append(details, fmt.Sprintf("【%s】常用度高", c2.Char))
-	} else if c2.CommonLevel == 3 {
-		score += 1
-	}
-
 	if c1.Meaning != "" {
-		score += 4
-		details = append(details, fmt.Sprintf("【%s】有明确释义", c1.Char))
+		score += 2
 	}
 	if c2.Meaning != "" {
-		score += 4
-		details = append(details, fmt.Sprintf("【%s】有明确释义", c2.Char))
+		score += 2
 	}
 
 	stroke1 := c1.KangxiStroke
 	stroke2 := c2.KangxiStroke
 	if stroke1 >= 5 && stroke1 <= 15 {
-		score += 2
+		score += 1
 	}
 	if stroke2 >= 5 && stroke2 <= 15 {
-		score += 2
+		score += 1
 	}
 	diff := absInt(stroke1 - stroke2)
 	if diff <= 5 && stroke1 > 0 && stroke2 > 0 {
@@ -124,13 +146,6 @@ func (r *Rater) rateWenHua(rating *NameRating, c1, c2 *ent.Character) {
 	}
 
 	if len(c1.Pinyin) > 0 && len(c2.Pinyin) > 0 {
-		score += 2
-	}
-
-	if c1.GenderHint != "" {
-		score += 1
-	}
-	if c2.GenderHint != "" {
 		score += 1
 	}
 
@@ -370,6 +385,49 @@ func (r *Rater) rateYinYun(rating *NameRating, c1, c2 *ent.Character) {
 	tone1 := getTone(p1)
 	tone2 := getTone(p2)
 
+	// Full-name (surname + given name) tonal flow when the surname pinyin is
+	// available: three distinct tones sound livelier than three identical ones.
+	surnameTone := 0
+	if r.surnamePinyin != "" {
+		surnameTone = getTone(r.surnamePinyin)
+		tonePattern := []int{}
+		if surnameTone != 0 {
+			tonePattern = append(tonePattern, surnameTone)
+		}
+		if tone1 != 0 {
+			tonePattern = append(tonePattern, tone1)
+		}
+		if tone2 != 0 {
+			tonePattern = append(tonePattern, tone2)
+		}
+		distinct := make(map[int]bool)
+		for _, t := range tonePattern {
+			distinct[t] = true
+		}
+		switch {
+		case len(distinct) >= 3:
+			score += 8
+			details = append(details, "姓名连读声调起伏，抑扬顿挫")
+		case len(tonePattern) >= 2 && len(distinct) == 1:
+			score -= 8
+			details = append(details, "姓名连读声调单一，略显平淡")
+		}
+
+		// Surname and first given-name char sharing initials/finals stutters.
+		sInitial := getShengMu(stripTone(r.surnamePinyin))
+		sFinal := getYunMu(stripTone(r.surnamePinyin))
+		i1 := getShengMu(stripTone(p1))
+		f1 := getYunMu(stripTone(p1))
+		if sInitial != "" && sInitial == i1 {
+			score -= 4
+			details = append(details, "姓与名首字声母相同，读起来拗口")
+		}
+		if sFinal != "" && sFinal == f1 && sInitial != i1 {
+			score -= 3
+			details = append(details, "姓与名首字韵母相近")
+		}
+	}
+
 	if tone1 != tone2 && tone1 != 0 && tone2 != 0 {
 		score += 8
 		details = append(details, "两字声调不同，抑扬顿挫")
@@ -394,6 +452,17 @@ func (r *Rater) rateYinYun(rating *NameRating, c1, c2 *ent.Character) {
 		details = append(details, "韵母不同，朗朗上口")
 	} else if final1 == final2 && final1 != "" {
 		score -= 3
+	}
+
+	// Unfortunate homophone screening over the full pinyin sequence.
+	syllables := make([]string, 0, 3)
+	if r.surnamePinyin != "" {
+		syllables = append(syllables, stripTone(r.surnamePinyin))
+	}
+	syllables = append(syllables, stripTone(p1), stripTone(p2))
+	if penalty, phrase := r.aesthetic.HomophonePenalty(syllables); penalty != 0 {
+		score += penalty
+		details = append(details, fmt.Sprintf("全名读音与「%s」谐音，需注意", phrase))
 	}
 
 	if score > 100 {
@@ -496,16 +565,60 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+// toneMarkMap maps tone-marked vowels to their tone number.
+var toneMarkMap = map[rune]int{
+	'ā': 1, 'á': 2, 'ǎ': 3, 'à': 4,
+	'ē': 1, 'é': 2, 'ě': 3, 'è': 4,
+	'ī': 1, 'í': 2, 'ǐ': 3, 'ì': 4,
+	'ō': 1, 'ó': 2, 'ǒ': 3, 'ò': 4,
+	'ū': 1, 'ú': 2, 'ǔ': 3, 'ù': 4,
+	'ǖ': 1, 'ǘ': 2, 'ǚ': 3, 'ǜ': 4,
+}
+
+// asciiVowelMap maps tone-marked vowels to their plain ASCII form.
+var asciiVowelMap = map[rune]rune{
+	'ā': 'a', 'á': 'a', 'ǎ': 'a', 'à': 'a',
+	'ē': 'e', 'é': 'e', 'ě': 'e', 'è': 'e',
+	'ī': 'i', 'í': 'i', 'ǐ': 'i', 'ì': 'i',
+	'ō': 'o', 'ó': 'o', 'ǒ': 'o', 'ò': 'o',
+	'ū': 'u', 'ú': 'u', 'ǔ': 'u', 'ù': 'u',
+	'ǖ': 'v', 'ǘ': 'v', 'ǚ': 'v', 'ǜ': 'v',
+	'ü': 'v',
+}
+
 func getTone(pinyin string) int {
 	runes := []rune(pinyin)
 	if len(runes) == 0 {
 		return 0
 	}
-	last := runes[len(runes)-1]
-	if last >= '1' && last <= '4' {
+	// Digit-suffixed form, e.g. "yang2".
+	if last := runes[len(runes)-1]; last >= '1' && last <= '4' {
 		return int(last - '0')
 	}
+	// Diacritic form, e.g. "liáng".
+	for _, r := range runes {
+		if t, ok := toneMarkMap[r]; ok {
+			return t
+		}
+	}
 	return 0
+}
+
+// stripTone converts a pinyin syllable to plain ASCII without tones,
+// e.g. "liáng" -> "liang", "yang2" -> "yang".
+func stripTone(pinyin string) string {
+	var b strings.Builder
+	for _, r := range pinyin {
+		if repl, ok := asciiVowelMap[r]; ok {
+			b.WriteRune(repl)
+			continue
+		}
+		if r >= '1' && r <= '4' {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func getInitial(pinyin string) string {

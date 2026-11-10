@@ -138,10 +138,14 @@ go build -o fate ./cmd/console
 |--------|----------|-------------|
 | `GET` | `/health` | Health check |
 | `POST` | `/api/generate` | Async name generation (returns task_id) |
-| `GET` | `/api/task/:id` | Query task status |
-| `GET` | `/api/names/:taskId` | Paginated name list |
-| `GET` | `/api/name-detail` | Detailed name analysis |
-| `GET` | `/api/explore/:taskId` | Random name exploration |
+| `GET` | `/api/generate/status?task_id=` | Query task status |
+| `GET` | `/api/generate/result?task_id=` | Task result (top names) |
+| `GET` | `/api/generate/names?task_id=&page=&size=` | Paginated name list |
+| `GET` | `/api/generate/explore?task_id=` | Random name exploration |
+| `GET` | `/api/name-detail?task_id=&char1=&char2=` | Detailed name analysis |
+| `POST` | `/api/name-score` | Score an existing name |
+| `GET` | `/api/poetry/search?keyword=&type=&dynasty=&page=&size=` | Poetry search (requires poetry data) |
+| `GET` | `/api/v1/characters?char=` | Character info lookup |
 
 ---
 

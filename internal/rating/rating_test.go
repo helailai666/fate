@@ -1,11 +1,11 @@
-﻿package rating
+package rating
 
 import (
 	"testing"
 
-	"github.com/godcong/chronos/v2"
-	chronosfate "github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/ent"
+	chronosfate "github.com/babyname/fate/v4/internal/chronosfate"
+	"github.com/godcong/chronos/v2"
 )
 
 func TestNewRater(t *testing.T) {

@@ -1,19 +1,20 @@
-﻿package main
+package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
-	v2 "github.com/godcong/chronos/v2"
-	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4"
 	"github.com/babyname/fate/v4/internal/analysis"
+	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/internal/database"
 	"github.com/babyname/fate/v4/internal/log"
 	"github.com/babyname/fate/v4/internal/repository"
+	v2 "github.com/godcong/chronos/v2"
 
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,7 @@ func cmdName() *cobra.Command {
 	var sex string
 	var xiyong string
 	var strictness string
+	var poetry string
 	cmd := &cobra.Command{
 		Use:   "name",
 		Short: "生成姓名列表",
@@ -38,8 +40,8 @@ func cmdName() *cobra.Command {
 				return
 			}
 
-			f := fate.NewWithRepo(cfg, repo)
-			s := f.NewSessionWithFilter(fate.NewFilter(fate.FilterOption{
+			poetryMode := poetryModeFromFlag(poetry)
+			filterOpts := fate.FilterOption{
 				CharacterFilter:     true,
 				CharacterFilterType: 0,
 				MinStroke:           3,
@@ -50,7 +52,10 @@ func cmdName() *cobra.Command {
 				SexFilter:           false,
 				XiYongMethod:        xiyong,
 				FilterStrictness:    strictness,
-			}))
+				PoetryMode:          poetryMode,
+			}
+			f := fate.NewWithRepo(cfg, repo)
+			s := f.NewSessionWithFilter(fate.NewFilter(filterOpts))
 			fmt.Println("last", last)
 			l, ok := getLastChar(last)
 			if !ok {
@@ -71,6 +76,14 @@ func cmdName() *cobra.Command {
 			if sex == "girl" {
 				sx = 0
 			}
+
+			// Poetry modes run on the modern pipeline, which supports
+			// poetry filtering, same-sentence pair boosts and origin lookup.
+			if poetryMode > 0 {
+				runPoetryGenerate(f, &filterOpts, l, b, sx)
+				return
+			}
+
 			input := &fate.Input{
 				Last: l,
 				Born: b,
@@ -110,9 +123,49 @@ func cmdName() *cobra.Command {
 	cmd.Flags().StringVarP(&output, "output", "o", "", "设置输出路径")
 	cmd.Flags().StringVar(&xiyong, "xiyong", "balance", "喜用神算法: balance(平衡用神法) 或 geju(格局用神法)")
 	cmd.Flags().StringVar(&strictness, "strictness", "moderate", "五格筛选严格度: strict, moderate, relaxed")
+	cmd.Flags().StringVar(&poetry, "poetry", "none", "诗词取名模式: none(关闭), prefer(优先), only(仅诗词)")
 
 	cmd.AddCommand(cmdNameDetail())
 	return cmd
+}
+
+// poetryModeFromFlag maps the --poetry flag to FilterOption.PoetryMode.
+func poetryModeFromFlag(flag string) int {
+	switch strings.ToLower(strings.TrimSpace(flag)) {
+	case "prefer", "1":
+		return 1
+	case "only", "2":
+		return 2
+	default:
+		return 0
+	}
+}
+
+// runPoetryGenerate runs the modern generation pipeline with poetry support
+// and prints the top results with their poem sources.
+func runPoetryGenerate(f fate.Fate, opts *fate.FilterOption, l [2]string, b time.Time, sx int) {
+	result, err := f.Generate(context.Background(), fate.GenerateRequest{
+		LastName: l[0] + l[1],
+		Born:     b,
+		Sex:      fate.Sex(sx),
+		Filter:   opts,
+	})
+	if err != nil {
+		fmt.Println("生成失败:", err)
+		return
+	}
+	fmt.Printf("\n共 %d 个候选名字，Top %d:\n\n", result.ExcellentTable.Len(), len(result.TopNames))
+	for i, nr := range result.TopNames {
+		fmt.Printf("%2d. %s  评分: %.1f  等级: %s\n", i+1, nr.FullName, nr.Score, nr.Grade)
+		if nr.Char1.PoetryOrigin != nil {
+			o := nr.Char1.PoetryOrigin
+			fmt.Printf("    %s 出自《%s》%s：%s\n", nr.Char1.Char, o.Title, strings.TrimSpace(o.Dynasty+"·"+o.Author), o.Sentence)
+		}
+		if nr.Char2.PoetryOrigin != nil {
+			o := nr.Char2.PoetryOrigin
+			fmt.Printf("    %s 出自《%s》%s：%s\n", nr.Char2.Char, o.Title, strings.TrimSpace(o.Dynasty+"·"+o.Author), o.Sentence)
+		}
+	}
 }
 
 func cmdNameDetail() *cobra.Command {
@@ -182,6 +235,24 @@ func cmdNameDetail() *cobra.Command {
 			}
 
 			nr := analysis.BuildNameResult(0, l[0], c1, c2, l1, l2, fateData)
+			// Attach poetry sources when available.
+			for _, hit := range []*struct {
+				char string
+				ci   *analysis.CharInfo
+			}{{c1.Char, &nr.Char1}, {c2.Char, &nr.Char2}} {
+				po, err := db.BestPoemOrigin(ctx, hit.char)
+				if err != nil || po == nil {
+					continue
+				}
+				hit.ci.PoetryOrigin = &analysis.PoetryOrigin{
+					Title:    po.Title,
+					Author:   po.Author,
+					Dynasty:  po.Dynasty,
+					Sentence: po.Sentence,
+					Type:     po.Type,
+				}
+				hit.ci.HasPoetry = true
+			}
 			printNameDetail(nr)
 		},
 	}
@@ -197,7 +268,11 @@ func getRepository() *repository.Repository {
 	if err != nil {
 		return nil
 	}
-	return repository.New(cli)
+	repo := repository.New(cli)
+	if raw, err := database.RawDB(cfg.Database); err == nil {
+		repo.SetRawDB(raw)
+	}
+	return repo
 }
 
 func printNameDetail(nr analysis.NameResult) {
@@ -246,6 +321,18 @@ func printNameDetail(nr analysis.NameResult) {
 	fmt.Printf("  成功运: %s\n", nr.ChengGongYun)
 	fmt.Printf("  人际关系: %s\n", nr.RenJiGuanXi)
 	fmt.Println()
+	if nr.Char1.PoetryOrigin != nil || nr.Char2.PoetryOrigin != nil {
+		fmt.Println("  【诗词出处】")
+		if o := nr.Char1.PoetryOrigin; o != nil {
+			fmt.Printf("  %s：《%s》%s·%s\n", nr.Char1.Char, o.Title, o.Dynasty, o.Author)
+			fmt.Printf("    %s\n", o.Sentence)
+		}
+		if o := nr.Char2.PoetryOrigin; o != nil {
+			fmt.Printf("  %s：《%s》%s·%s\n", nr.Char2.Char, o.Title, o.Dynasty, o.Author)
+			fmt.Printf("    %s\n", o.Sentence)
+		}
+		fmt.Println()
+	}
 	if nr.ZhouYi != nil {
 		fmt.Println("  【周易卦象】")
 		fmt.Printf("  本卦: %s（%s）\n", nr.ZhouYi.BenGuaName, nr.ZhouYi.BenGuaJiXiong)

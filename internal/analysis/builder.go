@@ -1,21 +1,39 @@
-﻿// Package analysis provides name analysis and report generation.
+// Package analysis provides name analysis and report generation.
 package analysis
 
 import (
 	"fmt"
 	"sort"
 
-	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/ent"
+	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/internal/rating"
 	"github.com/babyname/fate/v4/internal/wuge"
 	"github.com/babyname/fate/v4/internal/wuxing"
 )
 
+// buildConfig carries optional BuildNameResult settings.
+type buildConfig struct {
+	surnamePinyin string
+}
+
+// BuildOption customizes BuildNameResult behaviour.
+type BuildOption func(*buildConfig)
+
+// WithSurnamePinyin supplies the surname pinyin so yin-yun scoring can
+// evaluate the full three-syllable name.
+func WithSurnamePinyin(p string) BuildOption {
+	return func(c *buildConfig) { c.surnamePinyin = p }
+}
+
 // BuildNameResult builds a single NameResult from the given character data and fate information.
 // It calculates wuge (five strokes), sancai (three talents), luck analysis, zhouyi hexagram,
 // and the overall name rating score.
-func BuildNameResult(rank int, surname string, c1, c2 *ent.Character, l1, l2 int, fateData *chronosfate.FateData) NameResult {
+func BuildNameResult(rank int, surname string, c1, c2 *ent.Character, l1, l2 int, fateData *chronosfate.FateData, opts ...BuildOption) NameResult {
+	cfg := buildConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 	f1 := c1.ScienceStroke
 	f2 := c2.ScienceStroke
 
@@ -74,6 +92,9 @@ func BuildNameResult(rank int, surname string, c1, c2 *ent.Character, l1, l2 int
 
 	var nr *rating.NameRating
 	rater := rating.NewRaterWithStrokes(fateData, l1, l2)
+	if cfg.surnamePinyin != "" {
+		rater.SetSurnamePinyin(cfg.surnamePinyin)
+	}
 	nr = rater.RateName(surname, c1, c2)
 
 	strokeStr := fmt.Sprintf("%d,%d,%d", l1, f1, f2)

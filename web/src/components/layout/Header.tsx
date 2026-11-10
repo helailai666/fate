@@ -13,6 +13,7 @@ export function Header() {
   const [poetryOpen, setPoetryOpen] = useState(false);
 
   const isHome = location.pathname === '/';
+  const isPoetry = location.pathname === '/poetry';
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-background/80 backdrop-blur-xl">
@@ -40,6 +41,19 @@ export function Header() {
           >
             <Sparkles className="h-4 w-4" />
             命名
+          </button>
+
+          <button
+            onClick={() => navigate('/poetry')}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200',
+              isPoetry
+                ? 'bg-white/10 text-foreground border border-white/10'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5',
+            )}
+          >
+            <BookOpen className="h-4 w-4" />
+            诗词
           </button>
 
           <Dialog open={scoreOpen} onOpenChange={setScoreOpen}>

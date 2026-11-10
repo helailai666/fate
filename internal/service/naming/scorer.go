@@ -12,6 +12,18 @@ import (
 	"github.com/babyname/fate/v4/internal/wuge"
 )
 
+// poetryPairBonus rewards candidate pairs whose characters co-occur in the
+// same poem sentence (see ROADMAP 1.3.2 "上下文连贯性").
+const poetryPairBonus = 5.0
+
+// boostPairKey returns the sorted-pair key used in the pair boost set.
+func boostPairKey(a, b string) string {
+	if a > b {
+		a, b = b, a
+	}
+	return a + b
+}
+
 // runScoring evaluates all candidate name pairs derived from lucky wuge
 // combinations and pushes qualifying entries into the excellent table.
 //
@@ -27,6 +39,7 @@ func runScoring(
 	rater *rating.Rater,
 	table *ExcellentTable,
 	poetrySet map[string]bool,
+	pairBoost map[string]struct{},
 	chars map[int][]*ent.Character,
 	flt filter.Filter,
 ) {
@@ -69,16 +82,25 @@ func runScoring(
 
 				nr := rater.RateName("", c1, c2)
 
-				hasPoetry := poetrySet[c1.Char] || poetrySet[c2.Char]
+				score := nr.TotalScore
+				boosted := false
+				if pairBoost != nil {
+					if _, ok := pairBoost[boostPairKey(c1.Char, c2.Char)]; ok {
+						score += poetryPairBonus
+						boosted = true
+					}
+				}
+				hasPoetry := poetrySet[c1.Char] || poetrySet[c2.Char] || boosted
 
 				table.TryPush(ExcellentEntry{
 					Char1:     c1.Char,
 					Char2:     c2.Char,
-					Score:     nr.TotalScore,
+					Score:     score,
 					Grade:     nr.Grade,
 					WuXing1:   c1.WuXing,
 					WuXing2:   c2.WuXing,
 					HasPoetry: hasPoetry,
+					Semantic:  nr.SemanticScore,
 				})
 			}
 		}
@@ -98,6 +120,7 @@ func runScoringParallel(
 	rater *rating.Rater,
 	mainTable *ExcellentTable,
 	poetrySet map[string]bool,
+	pairBoost map[string]struct{},
 	chars map[int][]*ent.Character,
 	flt filter.Filter,
 	onBatch func(),
@@ -134,7 +157,7 @@ func runScoringParallel(
 		go func() {
 			defer wg.Done()
 			localTable := NewExcellentTable()
-			scoreChunk(ctx, chunk, rater, localTable, poetrySet, chars, flt)
+			scoreChunk(ctx, chunk, rater, localTable, poetrySet, pairBoost, chars, flt)
 			localTable.Finalize()
 			entries := localTable.AllEntries()
 			if len(entries) > 0 {
@@ -168,6 +191,7 @@ func scoreChunk(
 	rater *rating.Rater,
 	table *ExcellentTable,
 	poetrySet map[string]bool,
+	pairBoost map[string]struct{},
 	chars map[int][]*ent.Character,
 	flt filter.Filter,
 ) {
@@ -215,16 +239,26 @@ func scoreChunk(
 				}
 
 				nr := rater.RateName("", c1, c2)
-				hasPoetry := poetrySet[c1.Char] || poetrySet[c2.Char]
+
+				score := nr.TotalScore
+				boosted := false
+				if pairBoost != nil {
+					if _, ok := pairBoost[boostPairKey(c1.Char, c2.Char)]; ok {
+						score += poetryPairBonus
+						boosted = true
+					}
+				}
+				hasPoetry := poetrySet[c1.Char] || poetrySet[c2.Char] || boosted
 
 				table.TryPush(ExcellentEntry{
 					Char1:     c1.Char,
 					Char2:     c2.Char,
-					Score:     nr.TotalScore,
+					Score:     score,
 					Grade:     nr.Grade,
 					WuXing1:   c1.WuXing,
 					WuXing2:   c2.WuXing,
 					HasPoetry: hasPoetry,
+					Semantic:  nr.SemanticScore,
 				})
 			}
 		}

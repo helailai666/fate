@@ -8,6 +8,7 @@ import type {
   NamesResponse,
   NameScoreRequest,
   PoetrySearchResponse,
+  PoetrySearchParams,
 } from '@/types/api';
 
 const BASE = '/api';
@@ -72,5 +73,16 @@ export const api = {
     const params = new URLSearchParams();
     params.set('keyword', keyword);
     return request(`/poetry/search?${params.toString()}`);
+  },
+
+  searchPoetryEx(params: PoetrySearchParams): Promise<PoetrySearchResponse> {
+    const qs = new URLSearchParams();
+    if (params.keyword) qs.set('keyword', params.keyword);
+    if (params.author) qs.set('author', params.author);
+    if (params.dynasty) qs.set('dynasty', params.dynasty);
+    if (params.type) qs.set('type', params.type);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.size) qs.set('size', String(params.size));
+    return request(`/poetry/search?${qs.toString()}`);
   },
 };

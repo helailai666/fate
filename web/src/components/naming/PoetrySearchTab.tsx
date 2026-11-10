@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, BookOpen } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -34,11 +33,20 @@ export function PoetrySearchTab() {
     }
   };
 
+  const typeLabelMap: Record<string, string> = {
+    shi: '诗',
+    ci: '词',
+    fu: '赋',
+    jing: '经',
+    other: '其他',
+  };
+
   const typeColorMap: Record<string, string> = {
-    '诗': 'bg-red-100 text-red-800',
-    '词': 'bg-blue-100 text-blue-800',
-    '曲': 'bg-orange-100 text-orange-800',
-    '赋': 'bg-purple-100 text-purple-800',
+    shi: 'bg-red-100 text-red-800',
+    ci: 'bg-blue-100 text-blue-800',
+    jing: 'bg-amber-100 text-amber-800',
+    fu: 'bg-purple-100 text-purple-800',
+    other: 'bg-gray-100 text-gray-800',
   };
 
   return (
@@ -99,9 +107,9 @@ export function PoetrySearchTab() {
                   </span>
                   <Badge
                     variant="secondary"
-                    className={typeColorMap[item.type] || 'bg-gray-100 text-gray-800'}
+                    className={typeColorMap[item.type] || typeColorMap.other}
                   >
-                    {item.type}
+                    {typeLabelMap[item.type] || item.type}
                   </Badge>
                 </div>
                 <p className="text-sm leading-relaxed text-foreground" style={{ fontFamily: 'STKaiti, KaiTi, serif' }}>

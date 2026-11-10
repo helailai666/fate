@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/babyname/fate/v4/ent/character"
@@ -17,6 +18,7 @@ type CharacterCreate struct {
 	config
 	mutation *CharacterMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetChar sets the "char" field.
@@ -574,6 +576,7 @@ func (cc *CharacterCreate) createSpec() (*Character, *sqlgraph.CreateSpec) {
 		_node = &Character{config: cc.config}
 		_spec = sqlgraph.NewCreateSpec(character.Table, sqlgraph.NewFieldSpec(character.FieldID, field.TypeInt))
 	)
+	_spec.OnConflict = cc.conflict
 	if id, ok := cc.mutation.ID(); ok {
 		_node.ID = id
 		_spec.ID.Value = id
@@ -755,10 +758,1051 @@ func (cc *CharacterCreate) createSpec() (*Character, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Character.Create().
+//		SetChar(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.CharacterUpsert) {
+//			SetChar(v+v).
+//		}).
+//		Exec(ctx)
+func (cc *CharacterCreate) OnConflict(opts ...sql.ConflictOption) *CharacterUpsertOne {
+	cc.conflict = opts
+	return &CharacterUpsertOne{
+		create: cc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Character.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (cc *CharacterCreate) OnConflictColumns(columns ...string) *CharacterUpsertOne {
+	cc.conflict = append(cc.conflict, sql.ConflictColumns(columns...))
+	return &CharacterUpsertOne{
+		create: cc,
+	}
+}
+
+type (
+	// CharacterUpsertOne is the builder for "upsert"-ing
+	//  one Character node.
+	CharacterUpsertOne struct {
+		create *CharacterCreate
+	}
+
+	// CharacterUpsert is the "OnConflict" setter.
+	CharacterUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetChar sets the "char" field.
+func (u *CharacterUpsert) SetChar(v string) *CharacterUpsert {
+	u.Set(character.FieldChar, v)
+	return u
+}
+
+// UpdateChar sets the "char" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateChar() *CharacterUpsert {
+	u.SetExcluded(character.FieldChar)
+	return u
+}
+
+// SetUnicode sets the "unicode" field.
+func (u *CharacterUpsert) SetUnicode(v string) *CharacterUpsert {
+	u.Set(character.FieldUnicode, v)
+	return u
+}
+
+// UpdateUnicode sets the "unicode" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateUnicode() *CharacterUpsert {
+	u.SetExcluded(character.FieldUnicode)
+	return u
+}
+
+// ClearUnicode clears the value of the "unicode" field.
+func (u *CharacterUpsert) ClearUnicode() *CharacterUpsert {
+	u.SetNull(character.FieldUnicode)
+	return u
+}
+
+// SetIsSimplified sets the "is_simplified" field.
+func (u *CharacterUpsert) SetIsSimplified(v bool) *CharacterUpsert {
+	u.Set(character.FieldIsSimplified, v)
+	return u
+}
+
+// UpdateIsSimplified sets the "is_simplified" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateIsSimplified() *CharacterUpsert {
+	u.SetExcluded(character.FieldIsSimplified)
+	return u
+}
+
+// SetIsTraditional sets the "is_traditional" field.
+func (u *CharacterUpsert) SetIsTraditional(v bool) *CharacterUpsert {
+	u.Set(character.FieldIsTraditional, v)
+	return u
+}
+
+// UpdateIsTraditional sets the "is_traditional" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateIsTraditional() *CharacterUpsert {
+	u.SetExcluded(character.FieldIsTraditional)
+	return u
+}
+
+// SetIsKangxi sets the "is_kangxi" field.
+func (u *CharacterUpsert) SetIsKangxi(v bool) *CharacterUpsert {
+	u.Set(character.FieldIsKangxi, v)
+	return u
+}
+
+// UpdateIsKangxi sets the "is_kangxi" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateIsKangxi() *CharacterUpsert {
+	u.SetExcluded(character.FieldIsKangxi)
+	return u
+}
+
+// SetIsVariant sets the "is_variant" field.
+func (u *CharacterUpsert) SetIsVariant(v bool) *CharacterUpsert {
+	u.Set(character.FieldIsVariant, v)
+	return u
+}
+
+// UpdateIsVariant sets the "is_variant" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateIsVariant() *CharacterUpsert {
+	u.SetExcluded(character.FieldIsVariant)
+	return u
+}
+
+// SetIsAncient sets the "is_ancient" field.
+func (u *CharacterUpsert) SetIsAncient(v bool) *CharacterUpsert {
+	u.Set(character.FieldIsAncient, v)
+	return u
+}
+
+// UpdateIsAncient sets the "is_ancient" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateIsAncient() *CharacterUpsert {
+	u.SetExcluded(character.FieldIsAncient)
+	return u
+}
+
+// SetPinyin sets the "pinyin" field.
+func (u *CharacterUpsert) SetPinyin(v []string) *CharacterUpsert {
+	u.Set(character.FieldPinyin, v)
+	return u
+}
+
+// UpdatePinyin sets the "pinyin" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdatePinyin() *CharacterUpsert {
+	u.SetExcluded(character.FieldPinyin)
+	return u
+}
+
+// ClearPinyin clears the value of the "pinyin" field.
+func (u *CharacterUpsert) ClearPinyin() *CharacterUpsert {
+	u.SetNull(character.FieldPinyin)
+	return u
+}
+
+// SetRadical sets the "radical" field.
+func (u *CharacterUpsert) SetRadical(v string) *CharacterUpsert {
+	u.Set(character.FieldRadical, v)
+	return u
+}
+
+// UpdateRadical sets the "radical" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateRadical() *CharacterUpsert {
+	u.SetExcluded(character.FieldRadical)
+	return u
+}
+
+// ClearRadical clears the value of the "radical" field.
+func (u *CharacterUpsert) ClearRadical() *CharacterUpsert {
+	u.SetNull(character.FieldRadical)
+	return u
+}
+
+// SetRadicalStroke sets the "radical_stroke" field.
+func (u *CharacterUpsert) SetRadicalStroke(v int) *CharacterUpsert {
+	u.Set(character.FieldRadicalStroke, v)
+	return u
+}
+
+// UpdateRadicalStroke sets the "radical_stroke" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateRadicalStroke() *CharacterUpsert {
+	u.SetExcluded(character.FieldRadicalStroke)
+	return u
+}
+
+// AddRadicalStroke adds v to the "radical_stroke" field.
+func (u *CharacterUpsert) AddRadicalStroke(v int) *CharacterUpsert {
+	u.Add(character.FieldRadicalStroke, v)
+	return u
+}
+
+// ClearRadicalStroke clears the value of the "radical_stroke" field.
+func (u *CharacterUpsert) ClearRadicalStroke() *CharacterUpsert {
+	u.SetNull(character.FieldRadicalStroke)
+	return u
+}
+
+// SetSimplifiedStroke sets the "simplified_stroke" field.
+func (u *CharacterUpsert) SetSimplifiedStroke(v int) *CharacterUpsert {
+	u.Set(character.FieldSimplifiedStroke, v)
+	return u
+}
+
+// UpdateSimplifiedStroke sets the "simplified_stroke" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateSimplifiedStroke() *CharacterUpsert {
+	u.SetExcluded(character.FieldSimplifiedStroke)
+	return u
+}
+
+// AddSimplifiedStroke adds v to the "simplified_stroke" field.
+func (u *CharacterUpsert) AddSimplifiedStroke(v int) *CharacterUpsert {
+	u.Add(character.FieldSimplifiedStroke, v)
+	return u
+}
+
+// ClearSimplifiedStroke clears the value of the "simplified_stroke" field.
+func (u *CharacterUpsert) ClearSimplifiedStroke() *CharacterUpsert {
+	u.SetNull(character.FieldSimplifiedStroke)
+	return u
+}
+
+// SetTraditionalStroke sets the "traditional_stroke" field.
+func (u *CharacterUpsert) SetTraditionalStroke(v int) *CharacterUpsert {
+	u.Set(character.FieldTraditionalStroke, v)
+	return u
+}
+
+// UpdateTraditionalStroke sets the "traditional_stroke" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateTraditionalStroke() *CharacterUpsert {
+	u.SetExcluded(character.FieldTraditionalStroke)
+	return u
+}
+
+// AddTraditionalStroke adds v to the "traditional_stroke" field.
+func (u *CharacterUpsert) AddTraditionalStroke(v int) *CharacterUpsert {
+	u.Add(character.FieldTraditionalStroke, v)
+	return u
+}
+
+// ClearTraditionalStroke clears the value of the "traditional_stroke" field.
+func (u *CharacterUpsert) ClearTraditionalStroke() *CharacterUpsert {
+	u.SetNull(character.FieldTraditionalStroke)
+	return u
+}
+
+// SetKangxiStroke sets the "kangxi_stroke" field.
+func (u *CharacterUpsert) SetKangxiStroke(v int) *CharacterUpsert {
+	u.Set(character.FieldKangxiStroke, v)
+	return u
+}
+
+// UpdateKangxiStroke sets the "kangxi_stroke" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateKangxiStroke() *CharacterUpsert {
+	u.SetExcluded(character.FieldKangxiStroke)
+	return u
+}
+
+// AddKangxiStroke adds v to the "kangxi_stroke" field.
+func (u *CharacterUpsert) AddKangxiStroke(v int) *CharacterUpsert {
+	u.Add(character.FieldKangxiStroke, v)
+	return u
+}
+
+// ClearKangxiStroke clears the value of the "kangxi_stroke" field.
+func (u *CharacterUpsert) ClearKangxiStroke() *CharacterUpsert {
+	u.SetNull(character.FieldKangxiStroke)
+	return u
+}
+
+// SetScienceStroke sets the "science_stroke" field.
+func (u *CharacterUpsert) SetScienceStroke(v int) *CharacterUpsert {
+	u.Set(character.FieldScienceStroke, v)
+	return u
+}
+
+// UpdateScienceStroke sets the "science_stroke" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateScienceStroke() *CharacterUpsert {
+	u.SetExcluded(character.FieldScienceStroke)
+	return u
+}
+
+// AddScienceStroke adds v to the "science_stroke" field.
+func (u *CharacterUpsert) AddScienceStroke(v int) *CharacterUpsert {
+	u.Add(character.FieldScienceStroke, v)
+	return u
+}
+
+// ClearScienceStroke clears the value of the "science_stroke" field.
+func (u *CharacterUpsert) ClearScienceStroke() *CharacterUpsert {
+	u.SetNull(character.FieldScienceStroke)
+	return u
+}
+
+// SetWuXing sets the "wu_xing" field.
+func (u *CharacterUpsert) SetWuXing(v string) *CharacterUpsert {
+	u.Set(character.FieldWuXing, v)
+	return u
+}
+
+// UpdateWuXing sets the "wu_xing" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateWuXing() *CharacterUpsert {
+	u.SetExcluded(character.FieldWuXing)
+	return u
+}
+
+// ClearWuXing clears the value of the "wu_xing" field.
+func (u *CharacterUpsert) ClearWuXing() *CharacterUpsert {
+	u.SetNull(character.FieldWuXing)
+	return u
+}
+
+// SetRegular sets the "regular" field.
+func (u *CharacterUpsert) SetRegular(v bool) *CharacterUpsert {
+	u.Set(character.FieldRegular, v)
+	return u
+}
+
+// UpdateRegular sets the "regular" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateRegular() *CharacterUpsert {
+	u.SetExcluded(character.FieldRegular)
+	return u
+}
+
+// SetCommonLevel sets the "common_level" field.
+func (u *CharacterUpsert) SetCommonLevel(v int) *CharacterUpsert {
+	u.Set(character.FieldCommonLevel, v)
+	return u
+}
+
+// UpdateCommonLevel sets the "common_level" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateCommonLevel() *CharacterUpsert {
+	u.SetExcluded(character.FieldCommonLevel)
+	return u
+}
+
+// AddCommonLevel adds v to the "common_level" field.
+func (u *CharacterUpsert) AddCommonLevel(v int) *CharacterUpsert {
+	u.Add(character.FieldCommonLevel, v)
+	return u
+}
+
+// ClearCommonLevel clears the value of the "common_level" field.
+func (u *CharacterUpsert) ClearCommonLevel() *CharacterUpsert {
+	u.SetNull(character.FieldCommonLevel)
+	return u
+}
+
+// SetGenderHint sets the "gender_hint" field.
+func (u *CharacterUpsert) SetGenderHint(v string) *CharacterUpsert {
+	u.Set(character.FieldGenderHint, v)
+	return u
+}
+
+// UpdateGenderHint sets the "gender_hint" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateGenderHint() *CharacterUpsert {
+	u.SetExcluded(character.FieldGenderHint)
+	return u
+}
+
+// ClearGenderHint clears the value of the "gender_hint" field.
+func (u *CharacterUpsert) ClearGenderHint() *CharacterUpsert {
+	u.SetNull(character.FieldGenderHint)
+	return u
+}
+
+// SetNameable sets the "nameable" field.
+func (u *CharacterUpsert) SetNameable(v bool) *CharacterUpsert {
+	u.Set(character.FieldNameable, v)
+	return u
+}
+
+// UpdateNameable sets the "nameable" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateNameable() *CharacterUpsert {
+	u.SetExcluded(character.FieldNameable)
+	return u
+}
+
+// SetHasPoetry sets the "has_poetry" field.
+func (u *CharacterUpsert) SetHasPoetry(v bool) *CharacterUpsert {
+	u.Set(character.FieldHasPoetry, v)
+	return u
+}
+
+// UpdateHasPoetry sets the "has_poetry" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateHasPoetry() *CharacterUpsert {
+	u.SetExcluded(character.FieldHasPoetry)
+	return u
+}
+
+// SetMeaning sets the "meaning" field.
+func (u *CharacterUpsert) SetMeaning(v string) *CharacterUpsert {
+	u.Set(character.FieldMeaning, v)
+	return u
+}
+
+// UpdateMeaning sets the "meaning" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateMeaning() *CharacterUpsert {
+	u.SetExcluded(character.FieldMeaning)
+	return u
+}
+
+// ClearMeaning clears the value of the "meaning" field.
+func (u *CharacterUpsert) ClearMeaning() *CharacterUpsert {
+	u.SetNull(character.FieldMeaning)
+	return u
+}
+
+// SetSource sets the "source" field.
+func (u *CharacterUpsert) SetSource(v string) *CharacterUpsert {
+	u.Set(character.FieldSource, v)
+	return u
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateSource() *CharacterUpsert {
+	u.SetExcluded(character.FieldSource)
+	return u
+}
+
+// ClearSource clears the value of the "source" field.
+func (u *CharacterUpsert) ClearSource() *CharacterUpsert {
+	u.SetNull(character.FieldSource)
+	return u
+}
+
+// SetSourceConfidence sets the "source_confidence" field.
+func (u *CharacterUpsert) SetSourceConfidence(v float64) *CharacterUpsert {
+	u.Set(character.FieldSourceConfidence, v)
+	return u
+}
+
+// UpdateSourceConfidence sets the "source_confidence" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateSourceConfidence() *CharacterUpsert {
+	u.SetExcluded(character.FieldSourceConfidence)
+	return u
+}
+
+// AddSourceConfidence adds v to the "source_confidence" field.
+func (u *CharacterUpsert) AddSourceConfidence(v float64) *CharacterUpsert {
+	u.Add(character.FieldSourceConfidence, v)
+	return u
+}
+
+// ClearSourceConfidence clears the value of the "source_confidence" field.
+func (u *CharacterUpsert) ClearSourceConfidence() *CharacterUpsert {
+	u.SetNull(character.FieldSourceConfidence)
+	return u
+}
+
+// SetComment sets the "comment" field.
+func (u *CharacterUpsert) SetComment(v string) *CharacterUpsert {
+	u.Set(character.FieldComment, v)
+	return u
+}
+
+// UpdateComment sets the "comment" field to the value that was provided on create.
+func (u *CharacterUpsert) UpdateComment() *CharacterUpsert {
+	u.SetExcluded(character.FieldComment)
+	return u
+}
+
+// ClearComment clears the value of the "comment" field.
+func (u *CharacterUpsert) ClearComment() *CharacterUpsert {
+	u.SetNull(character.FieldComment)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
+// Using this option is equivalent to using:
+//
+//	client.Character.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//			sql.ResolveWith(func(u *sql.UpdateSet) {
+//				u.SetIgnore(character.FieldID)
+//			}),
+//		).
+//		Exec(ctx)
+func (u *CharacterUpsertOne) UpdateNewValues() *CharacterUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.ID(); exists {
+			s.SetIgnore(character.FieldID)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Character.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *CharacterUpsertOne) Ignore() *CharacterUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *CharacterUpsertOne) DoNothing() *CharacterUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the CharacterCreate.OnConflict
+// documentation for more info.
+func (u *CharacterUpsertOne) Update(set func(*CharacterUpsert)) *CharacterUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&CharacterUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetChar sets the "char" field.
+func (u *CharacterUpsertOne) SetChar(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetChar(v)
+	})
+}
+
+// UpdateChar sets the "char" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateChar() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateChar()
+	})
+}
+
+// SetUnicode sets the "unicode" field.
+func (u *CharacterUpsertOne) SetUnicode(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetUnicode(v)
+	})
+}
+
+// UpdateUnicode sets the "unicode" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateUnicode() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateUnicode()
+	})
+}
+
+// ClearUnicode clears the value of the "unicode" field.
+func (u *CharacterUpsertOne) ClearUnicode() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearUnicode()
+	})
+}
+
+// SetIsSimplified sets the "is_simplified" field.
+func (u *CharacterUpsertOne) SetIsSimplified(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsSimplified(v)
+	})
+}
+
+// UpdateIsSimplified sets the "is_simplified" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateIsSimplified() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsSimplified()
+	})
+}
+
+// SetIsTraditional sets the "is_traditional" field.
+func (u *CharacterUpsertOne) SetIsTraditional(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsTraditional(v)
+	})
+}
+
+// UpdateIsTraditional sets the "is_traditional" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateIsTraditional() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsTraditional()
+	})
+}
+
+// SetIsKangxi sets the "is_kangxi" field.
+func (u *CharacterUpsertOne) SetIsKangxi(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsKangxi(v)
+	})
+}
+
+// UpdateIsKangxi sets the "is_kangxi" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateIsKangxi() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsKangxi()
+	})
+}
+
+// SetIsVariant sets the "is_variant" field.
+func (u *CharacterUpsertOne) SetIsVariant(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsVariant(v)
+	})
+}
+
+// UpdateIsVariant sets the "is_variant" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateIsVariant() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsVariant()
+	})
+}
+
+// SetIsAncient sets the "is_ancient" field.
+func (u *CharacterUpsertOne) SetIsAncient(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsAncient(v)
+	})
+}
+
+// UpdateIsAncient sets the "is_ancient" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateIsAncient() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsAncient()
+	})
+}
+
+// SetPinyin sets the "pinyin" field.
+func (u *CharacterUpsertOne) SetPinyin(v []string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetPinyin(v)
+	})
+}
+
+// UpdatePinyin sets the "pinyin" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdatePinyin() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdatePinyin()
+	})
+}
+
+// ClearPinyin clears the value of the "pinyin" field.
+func (u *CharacterUpsertOne) ClearPinyin() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearPinyin()
+	})
+}
+
+// SetRadical sets the "radical" field.
+func (u *CharacterUpsertOne) SetRadical(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetRadical(v)
+	})
+}
+
+// UpdateRadical sets the "radical" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateRadical() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateRadical()
+	})
+}
+
+// ClearRadical clears the value of the "radical" field.
+func (u *CharacterUpsertOne) ClearRadical() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearRadical()
+	})
+}
+
+// SetRadicalStroke sets the "radical_stroke" field.
+func (u *CharacterUpsertOne) SetRadicalStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetRadicalStroke(v)
+	})
+}
+
+// AddRadicalStroke adds v to the "radical_stroke" field.
+func (u *CharacterUpsertOne) AddRadicalStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddRadicalStroke(v)
+	})
+}
+
+// UpdateRadicalStroke sets the "radical_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateRadicalStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateRadicalStroke()
+	})
+}
+
+// ClearRadicalStroke clears the value of the "radical_stroke" field.
+func (u *CharacterUpsertOne) ClearRadicalStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearRadicalStroke()
+	})
+}
+
+// SetSimplifiedStroke sets the "simplified_stroke" field.
+func (u *CharacterUpsertOne) SetSimplifiedStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetSimplifiedStroke(v)
+	})
+}
+
+// AddSimplifiedStroke adds v to the "simplified_stroke" field.
+func (u *CharacterUpsertOne) AddSimplifiedStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddSimplifiedStroke(v)
+	})
+}
+
+// UpdateSimplifiedStroke sets the "simplified_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateSimplifiedStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateSimplifiedStroke()
+	})
+}
+
+// ClearSimplifiedStroke clears the value of the "simplified_stroke" field.
+func (u *CharacterUpsertOne) ClearSimplifiedStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearSimplifiedStroke()
+	})
+}
+
+// SetTraditionalStroke sets the "traditional_stroke" field.
+func (u *CharacterUpsertOne) SetTraditionalStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetTraditionalStroke(v)
+	})
+}
+
+// AddTraditionalStroke adds v to the "traditional_stroke" field.
+func (u *CharacterUpsertOne) AddTraditionalStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddTraditionalStroke(v)
+	})
+}
+
+// UpdateTraditionalStroke sets the "traditional_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateTraditionalStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateTraditionalStroke()
+	})
+}
+
+// ClearTraditionalStroke clears the value of the "traditional_stroke" field.
+func (u *CharacterUpsertOne) ClearTraditionalStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearTraditionalStroke()
+	})
+}
+
+// SetKangxiStroke sets the "kangxi_stroke" field.
+func (u *CharacterUpsertOne) SetKangxiStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetKangxiStroke(v)
+	})
+}
+
+// AddKangxiStroke adds v to the "kangxi_stroke" field.
+func (u *CharacterUpsertOne) AddKangxiStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddKangxiStroke(v)
+	})
+}
+
+// UpdateKangxiStroke sets the "kangxi_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateKangxiStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateKangxiStroke()
+	})
+}
+
+// ClearKangxiStroke clears the value of the "kangxi_stroke" field.
+func (u *CharacterUpsertOne) ClearKangxiStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearKangxiStroke()
+	})
+}
+
+// SetScienceStroke sets the "science_stroke" field.
+func (u *CharacterUpsertOne) SetScienceStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetScienceStroke(v)
+	})
+}
+
+// AddScienceStroke adds v to the "science_stroke" field.
+func (u *CharacterUpsertOne) AddScienceStroke(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddScienceStroke(v)
+	})
+}
+
+// UpdateScienceStroke sets the "science_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateScienceStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateScienceStroke()
+	})
+}
+
+// ClearScienceStroke clears the value of the "science_stroke" field.
+func (u *CharacterUpsertOne) ClearScienceStroke() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearScienceStroke()
+	})
+}
+
+// SetWuXing sets the "wu_xing" field.
+func (u *CharacterUpsertOne) SetWuXing(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetWuXing(v)
+	})
+}
+
+// UpdateWuXing sets the "wu_xing" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateWuXing() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateWuXing()
+	})
+}
+
+// ClearWuXing clears the value of the "wu_xing" field.
+func (u *CharacterUpsertOne) ClearWuXing() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearWuXing()
+	})
+}
+
+// SetRegular sets the "regular" field.
+func (u *CharacterUpsertOne) SetRegular(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetRegular(v)
+	})
+}
+
+// UpdateRegular sets the "regular" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateRegular() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateRegular()
+	})
+}
+
+// SetCommonLevel sets the "common_level" field.
+func (u *CharacterUpsertOne) SetCommonLevel(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetCommonLevel(v)
+	})
+}
+
+// AddCommonLevel adds v to the "common_level" field.
+func (u *CharacterUpsertOne) AddCommonLevel(v int) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddCommonLevel(v)
+	})
+}
+
+// UpdateCommonLevel sets the "common_level" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateCommonLevel() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateCommonLevel()
+	})
+}
+
+// ClearCommonLevel clears the value of the "common_level" field.
+func (u *CharacterUpsertOne) ClearCommonLevel() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearCommonLevel()
+	})
+}
+
+// SetGenderHint sets the "gender_hint" field.
+func (u *CharacterUpsertOne) SetGenderHint(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetGenderHint(v)
+	})
+}
+
+// UpdateGenderHint sets the "gender_hint" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateGenderHint() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateGenderHint()
+	})
+}
+
+// ClearGenderHint clears the value of the "gender_hint" field.
+func (u *CharacterUpsertOne) ClearGenderHint() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearGenderHint()
+	})
+}
+
+// SetNameable sets the "nameable" field.
+func (u *CharacterUpsertOne) SetNameable(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetNameable(v)
+	})
+}
+
+// UpdateNameable sets the "nameable" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateNameable() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateNameable()
+	})
+}
+
+// SetHasPoetry sets the "has_poetry" field.
+func (u *CharacterUpsertOne) SetHasPoetry(v bool) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetHasPoetry(v)
+	})
+}
+
+// UpdateHasPoetry sets the "has_poetry" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateHasPoetry() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateHasPoetry()
+	})
+}
+
+// SetMeaning sets the "meaning" field.
+func (u *CharacterUpsertOne) SetMeaning(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetMeaning(v)
+	})
+}
+
+// UpdateMeaning sets the "meaning" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateMeaning() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateMeaning()
+	})
+}
+
+// ClearMeaning clears the value of the "meaning" field.
+func (u *CharacterUpsertOne) ClearMeaning() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearMeaning()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *CharacterUpsertOne) SetSource(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateSource() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// ClearSource clears the value of the "source" field.
+func (u *CharacterUpsertOne) ClearSource() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearSource()
+	})
+}
+
+// SetSourceConfidence sets the "source_confidence" field.
+func (u *CharacterUpsertOne) SetSourceConfidence(v float64) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetSourceConfidence(v)
+	})
+}
+
+// AddSourceConfidence adds v to the "source_confidence" field.
+func (u *CharacterUpsertOne) AddSourceConfidence(v float64) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddSourceConfidence(v)
+	})
+}
+
+// UpdateSourceConfidence sets the "source_confidence" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateSourceConfidence() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateSourceConfidence()
+	})
+}
+
+// ClearSourceConfidence clears the value of the "source_confidence" field.
+func (u *CharacterUpsertOne) ClearSourceConfidence() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearSourceConfidence()
+	})
+}
+
+// SetComment sets the "comment" field.
+func (u *CharacterUpsertOne) SetComment(v string) *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetComment(v)
+	})
+}
+
+// UpdateComment sets the "comment" field to the value that was provided on create.
+func (u *CharacterUpsertOne) UpdateComment() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateComment()
+	})
+}
+
+// ClearComment clears the value of the "comment" field.
+func (u *CharacterUpsertOne) ClearComment() *CharacterUpsertOne {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearComment()
+	})
+}
+
+// Exec executes the query.
+func (u *CharacterUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for CharacterCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *CharacterUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *CharacterUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *CharacterUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // CharacterCreateBulk is the builder for creating many Character entities in bulk.
 type CharacterCreateBulk struct {
 	config
 	builders []*CharacterCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the Character entities in the database.
@@ -785,6 +1829,7 @@ func (ccb *CharacterCreateBulk) Save(ctx context.Context) ([]*Character, error) 
 					_, err = mutators[i+1].Mutate(root, ccb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = ccb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, ccb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -835,6 +1880,607 @@ func (ccb *CharacterCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (ccb *CharacterCreateBulk) ExecX(ctx context.Context) {
 	if err := ccb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Character.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.CharacterUpsert) {
+//			SetChar(v+v).
+//		}).
+//		Exec(ctx)
+func (ccb *CharacterCreateBulk) OnConflict(opts ...sql.ConflictOption) *CharacterUpsertBulk {
+	ccb.conflict = opts
+	return &CharacterUpsertBulk{
+		create: ccb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Character.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (ccb *CharacterCreateBulk) OnConflictColumns(columns ...string) *CharacterUpsertBulk {
+	ccb.conflict = append(ccb.conflict, sql.ConflictColumns(columns...))
+	return &CharacterUpsertBulk{
+		create: ccb,
+	}
+}
+
+// CharacterUpsertBulk is the builder for "upsert"-ing
+// a bulk of Character nodes.
+type CharacterUpsertBulk struct {
+	create *CharacterCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.Character.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//			sql.ResolveWith(func(u *sql.UpdateSet) {
+//				u.SetIgnore(character.FieldID)
+//			}),
+//		).
+//		Exec(ctx)
+func (u *CharacterUpsertBulk) UpdateNewValues() *CharacterUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.ID(); exists {
+				s.SetIgnore(character.FieldID)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Character.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *CharacterUpsertBulk) Ignore() *CharacterUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *CharacterUpsertBulk) DoNothing() *CharacterUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the CharacterCreateBulk.OnConflict
+// documentation for more info.
+func (u *CharacterUpsertBulk) Update(set func(*CharacterUpsert)) *CharacterUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&CharacterUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetChar sets the "char" field.
+func (u *CharacterUpsertBulk) SetChar(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetChar(v)
+	})
+}
+
+// UpdateChar sets the "char" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateChar() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateChar()
+	})
+}
+
+// SetUnicode sets the "unicode" field.
+func (u *CharacterUpsertBulk) SetUnicode(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetUnicode(v)
+	})
+}
+
+// UpdateUnicode sets the "unicode" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateUnicode() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateUnicode()
+	})
+}
+
+// ClearUnicode clears the value of the "unicode" field.
+func (u *CharacterUpsertBulk) ClearUnicode() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearUnicode()
+	})
+}
+
+// SetIsSimplified sets the "is_simplified" field.
+func (u *CharacterUpsertBulk) SetIsSimplified(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsSimplified(v)
+	})
+}
+
+// UpdateIsSimplified sets the "is_simplified" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateIsSimplified() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsSimplified()
+	})
+}
+
+// SetIsTraditional sets the "is_traditional" field.
+func (u *CharacterUpsertBulk) SetIsTraditional(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsTraditional(v)
+	})
+}
+
+// UpdateIsTraditional sets the "is_traditional" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateIsTraditional() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsTraditional()
+	})
+}
+
+// SetIsKangxi sets the "is_kangxi" field.
+func (u *CharacterUpsertBulk) SetIsKangxi(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsKangxi(v)
+	})
+}
+
+// UpdateIsKangxi sets the "is_kangxi" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateIsKangxi() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsKangxi()
+	})
+}
+
+// SetIsVariant sets the "is_variant" field.
+func (u *CharacterUpsertBulk) SetIsVariant(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsVariant(v)
+	})
+}
+
+// UpdateIsVariant sets the "is_variant" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateIsVariant() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsVariant()
+	})
+}
+
+// SetIsAncient sets the "is_ancient" field.
+func (u *CharacterUpsertBulk) SetIsAncient(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetIsAncient(v)
+	})
+}
+
+// UpdateIsAncient sets the "is_ancient" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateIsAncient() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateIsAncient()
+	})
+}
+
+// SetPinyin sets the "pinyin" field.
+func (u *CharacterUpsertBulk) SetPinyin(v []string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetPinyin(v)
+	})
+}
+
+// UpdatePinyin sets the "pinyin" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdatePinyin() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdatePinyin()
+	})
+}
+
+// ClearPinyin clears the value of the "pinyin" field.
+func (u *CharacterUpsertBulk) ClearPinyin() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearPinyin()
+	})
+}
+
+// SetRadical sets the "radical" field.
+func (u *CharacterUpsertBulk) SetRadical(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetRadical(v)
+	})
+}
+
+// UpdateRadical sets the "radical" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateRadical() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateRadical()
+	})
+}
+
+// ClearRadical clears the value of the "radical" field.
+func (u *CharacterUpsertBulk) ClearRadical() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearRadical()
+	})
+}
+
+// SetRadicalStroke sets the "radical_stroke" field.
+func (u *CharacterUpsertBulk) SetRadicalStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetRadicalStroke(v)
+	})
+}
+
+// AddRadicalStroke adds v to the "radical_stroke" field.
+func (u *CharacterUpsertBulk) AddRadicalStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddRadicalStroke(v)
+	})
+}
+
+// UpdateRadicalStroke sets the "radical_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateRadicalStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateRadicalStroke()
+	})
+}
+
+// ClearRadicalStroke clears the value of the "radical_stroke" field.
+func (u *CharacterUpsertBulk) ClearRadicalStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearRadicalStroke()
+	})
+}
+
+// SetSimplifiedStroke sets the "simplified_stroke" field.
+func (u *CharacterUpsertBulk) SetSimplifiedStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetSimplifiedStroke(v)
+	})
+}
+
+// AddSimplifiedStroke adds v to the "simplified_stroke" field.
+func (u *CharacterUpsertBulk) AddSimplifiedStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddSimplifiedStroke(v)
+	})
+}
+
+// UpdateSimplifiedStroke sets the "simplified_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateSimplifiedStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateSimplifiedStroke()
+	})
+}
+
+// ClearSimplifiedStroke clears the value of the "simplified_stroke" field.
+func (u *CharacterUpsertBulk) ClearSimplifiedStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearSimplifiedStroke()
+	})
+}
+
+// SetTraditionalStroke sets the "traditional_stroke" field.
+func (u *CharacterUpsertBulk) SetTraditionalStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetTraditionalStroke(v)
+	})
+}
+
+// AddTraditionalStroke adds v to the "traditional_stroke" field.
+func (u *CharacterUpsertBulk) AddTraditionalStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddTraditionalStroke(v)
+	})
+}
+
+// UpdateTraditionalStroke sets the "traditional_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateTraditionalStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateTraditionalStroke()
+	})
+}
+
+// ClearTraditionalStroke clears the value of the "traditional_stroke" field.
+func (u *CharacterUpsertBulk) ClearTraditionalStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearTraditionalStroke()
+	})
+}
+
+// SetKangxiStroke sets the "kangxi_stroke" field.
+func (u *CharacterUpsertBulk) SetKangxiStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetKangxiStroke(v)
+	})
+}
+
+// AddKangxiStroke adds v to the "kangxi_stroke" field.
+func (u *CharacterUpsertBulk) AddKangxiStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddKangxiStroke(v)
+	})
+}
+
+// UpdateKangxiStroke sets the "kangxi_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateKangxiStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateKangxiStroke()
+	})
+}
+
+// ClearKangxiStroke clears the value of the "kangxi_stroke" field.
+func (u *CharacterUpsertBulk) ClearKangxiStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearKangxiStroke()
+	})
+}
+
+// SetScienceStroke sets the "science_stroke" field.
+func (u *CharacterUpsertBulk) SetScienceStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetScienceStroke(v)
+	})
+}
+
+// AddScienceStroke adds v to the "science_stroke" field.
+func (u *CharacterUpsertBulk) AddScienceStroke(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddScienceStroke(v)
+	})
+}
+
+// UpdateScienceStroke sets the "science_stroke" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateScienceStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateScienceStroke()
+	})
+}
+
+// ClearScienceStroke clears the value of the "science_stroke" field.
+func (u *CharacterUpsertBulk) ClearScienceStroke() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearScienceStroke()
+	})
+}
+
+// SetWuXing sets the "wu_xing" field.
+func (u *CharacterUpsertBulk) SetWuXing(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetWuXing(v)
+	})
+}
+
+// UpdateWuXing sets the "wu_xing" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateWuXing() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateWuXing()
+	})
+}
+
+// ClearWuXing clears the value of the "wu_xing" field.
+func (u *CharacterUpsertBulk) ClearWuXing() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearWuXing()
+	})
+}
+
+// SetRegular sets the "regular" field.
+func (u *CharacterUpsertBulk) SetRegular(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetRegular(v)
+	})
+}
+
+// UpdateRegular sets the "regular" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateRegular() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateRegular()
+	})
+}
+
+// SetCommonLevel sets the "common_level" field.
+func (u *CharacterUpsertBulk) SetCommonLevel(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetCommonLevel(v)
+	})
+}
+
+// AddCommonLevel adds v to the "common_level" field.
+func (u *CharacterUpsertBulk) AddCommonLevel(v int) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddCommonLevel(v)
+	})
+}
+
+// UpdateCommonLevel sets the "common_level" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateCommonLevel() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateCommonLevel()
+	})
+}
+
+// ClearCommonLevel clears the value of the "common_level" field.
+func (u *CharacterUpsertBulk) ClearCommonLevel() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearCommonLevel()
+	})
+}
+
+// SetGenderHint sets the "gender_hint" field.
+func (u *CharacterUpsertBulk) SetGenderHint(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetGenderHint(v)
+	})
+}
+
+// UpdateGenderHint sets the "gender_hint" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateGenderHint() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateGenderHint()
+	})
+}
+
+// ClearGenderHint clears the value of the "gender_hint" field.
+func (u *CharacterUpsertBulk) ClearGenderHint() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearGenderHint()
+	})
+}
+
+// SetNameable sets the "nameable" field.
+func (u *CharacterUpsertBulk) SetNameable(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetNameable(v)
+	})
+}
+
+// UpdateNameable sets the "nameable" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateNameable() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateNameable()
+	})
+}
+
+// SetHasPoetry sets the "has_poetry" field.
+func (u *CharacterUpsertBulk) SetHasPoetry(v bool) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetHasPoetry(v)
+	})
+}
+
+// UpdateHasPoetry sets the "has_poetry" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateHasPoetry() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateHasPoetry()
+	})
+}
+
+// SetMeaning sets the "meaning" field.
+func (u *CharacterUpsertBulk) SetMeaning(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetMeaning(v)
+	})
+}
+
+// UpdateMeaning sets the "meaning" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateMeaning() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateMeaning()
+	})
+}
+
+// ClearMeaning clears the value of the "meaning" field.
+func (u *CharacterUpsertBulk) ClearMeaning() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearMeaning()
+	})
+}
+
+// SetSource sets the "source" field.
+func (u *CharacterUpsertBulk) SetSource(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetSource(v)
+	})
+}
+
+// UpdateSource sets the "source" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateSource() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateSource()
+	})
+}
+
+// ClearSource clears the value of the "source" field.
+func (u *CharacterUpsertBulk) ClearSource() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearSource()
+	})
+}
+
+// SetSourceConfidence sets the "source_confidence" field.
+func (u *CharacterUpsertBulk) SetSourceConfidence(v float64) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetSourceConfidence(v)
+	})
+}
+
+// AddSourceConfidence adds v to the "source_confidence" field.
+func (u *CharacterUpsertBulk) AddSourceConfidence(v float64) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.AddSourceConfidence(v)
+	})
+}
+
+// UpdateSourceConfidence sets the "source_confidence" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateSourceConfidence() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateSourceConfidence()
+	})
+}
+
+// ClearSourceConfidence clears the value of the "source_confidence" field.
+func (u *CharacterUpsertBulk) ClearSourceConfidence() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearSourceConfidence()
+	})
+}
+
+// SetComment sets the "comment" field.
+func (u *CharacterUpsertBulk) SetComment(v string) *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.SetComment(v)
+	})
+}
+
+// UpdateComment sets the "comment" field to the value that was provided on create.
+func (u *CharacterUpsertBulk) UpdateComment() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.UpdateComment()
+	})
+}
+
+// ClearComment clears the value of the "comment" field.
+func (u *CharacterUpsertBulk) ClearComment() *CharacterUpsertBulk {
+	return u.Update(func(s *CharacterUpsert) {
+		s.ClearComment()
+	})
+}
+
+// Exec executes the query.
+func (u *CharacterUpsertBulk) Exec(ctx context.Context) error {
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the CharacterCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for CharacterCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *CharacterUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"flag"
@@ -26,10 +26,16 @@ func main() {
 
 	fmt.Printf("Fate server listening on %s\n", *addr)
 	fmt.Println("Endpoints:")
-	fmt.Println("  GET  /health           - health check")
-	fmt.Println("  POST /api/generate     - generate names")
-	fmt.Println("  GET  /api/name-detail  - get name detail")
-	fmt.Println("  GET  /                 - web UI (embedded)")
+	fmt.Println("  GET  /health                - health check")
+	fmt.Println("  POST /api/generate          - generate names")
+	fmt.Println("  GET  /api/generate/status   - task status")
+	fmt.Println("  GET  /api/generate/result   - task result")
+	fmt.Println("  GET  /api/generate/names    - paged name list")
+	fmt.Println("  GET  /api/generate/explore  - explore names")
+	fmt.Println("  GET  /api/name-detail       - get name detail")
+	fmt.Println("  POST /api/name-score        - score an existing name")
+	fmt.Println("  GET  /api/poetry/search     - search poetry")
+	fmt.Println("  GET  /                      - web UI (embedded)")
 
 	if err := http.ListenAndServe(*addr, handler); err != nil {
 		log.Fatal("server error: ", err)

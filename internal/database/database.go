@@ -2,8 +2,10 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/babyname/fate/v4/config"
@@ -50,6 +52,11 @@ func buildSqlite3(cfg config.DBConfig) (*ent.Client, error) {
 		name := cfg.Name
 		if name == "" {
 			name = "fate"
+		}
+		// Normalize the file name so the server, CLI tools and seeddb all
+		// operate on the same canonical fate.db file.
+		if !strings.HasSuffix(name, ".db") {
+			name += ".db"
 		}
 		return ent.Open(cfg.Driver, fmt.Sprintf("file:%s?cache=shared&_journal=WAL&_fk=1", name))
 	default:
@@ -106,6 +113,35 @@ func (d *database) Client() (*ent.Client, error) {
 
 func New(cfg config.DBConfig) Builder {
 	return &database{DBConfig: cfg}
+}
+
+// RawDB opens a database/sql handle with the same DSN the ent client uses,
+// for query paths (poetry search) that need raw SQL joins.
+func RawDB(cfg config.DBConfig) (*sql.DB, error) {
+	dsn := cfg.DSN
+	if dsn == "" && (cfg.Driver == "sqlite3" || cfg.Driver == "") {
+		name := cfg.Name
+		if name == "" {
+			name = "fate"
+		}
+		if !strings.HasSuffix(name, ".db") {
+			name += ".db"
+		}
+		switch cfg.Mode {
+		case "memory":
+			dsn = "file::memory:?cache=shared&_fk=1"
+		default:
+			dsn = fmt.Sprintf("file:%s?cache=shared&_journal=WAL&_fk=1", name)
+		}
+	}
+	if dsn == "" {
+		return nil, errors.New("raw db unsupported for this driver")
+	}
+	driver := cfg.Driver
+	if driver == "" {
+		driver = "sqlite3"
+	}
+	return sql.Open(driver, dsn)
 }
 
 var _ Builder = (*database)(nil)

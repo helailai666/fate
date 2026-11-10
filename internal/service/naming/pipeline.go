@@ -71,15 +71,22 @@ func (p *Pipeline) Generate(ctx context.Context, req GenerateRequest) (*Generate
 	// 4. Preload characters needed by lucky combos.
 	chars := preloadChars(ctx, p.db, lucky, req.Filter)
 
-	// 5. Query poetry set.
+	// 5. Query poetry set and same-sentence pair boost.
 	poetrySet := p.queryPoetrySet(ctx)
+	var pairBoost map[string]struct{}
+	if req.Filter.PoetryMode() > 0 {
+		// The boost query samples the large poem_char table; skip it when
+		// poetry is disabled to keep default-mode generation fast.
+		pairBoost = p.queryPairBoost(ctx, chars, poetrySet)
+	}
 
 	// 6. Create rater with fate data and surname strokes.
 	rater := rating.NewRaterWithStrokes(fateData, strokes[0], strokes[1])
+	rater.SetSurnamePinyin(surnamePinyin(req.LastName))
 
 	// 7. Score all candidates with 3-tier filter strictness fallback.
 	table := NewExcellentTable()
-	table, chars = p.runScoringWithFallback(ctx, lucky, rater, table, poetrySet, chars, req)
+	table, chars = p.runScoringWithFallback(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req)
 
 	// 8. Finalize the heap into sorted entries.
 	table.Finalize()
@@ -88,7 +95,7 @@ func (p *Pipeline) Generate(ctx context.Context, req GenerateRequest) (*Generate
 	charMap := buildCharMap(chars)
 
 	// 10. Convert top entries to analysis.NameResult slices.
-	result := p.buildResults(table, charMap, strokes, fateData, surnameStr(req.LastName))
+	result := p.buildResults(table, charMap, strokes, fateData, surnameStr(req.LastName), surnamePinyin(req.LastName))
 	return result, nil
 }
 
@@ -100,7 +107,12 @@ func (p *Pipeline) GenerateStream(ctx context.Context, req GenerateRequest, onBa
 	lucky := wuge.GetLuckyByLastName(strokes[0], strokes[1])
 	chars := preloadChars(ctx, p.db, lucky, req.Filter)
 	poetrySet := p.queryPoetrySet(ctx)
+	var pairBoost map[string]struct{}
+	if req.Filter.PoetryMode() > 0 {
+		pairBoost = p.queryPairBoost(ctx, chars, poetrySet)
+	}
 	rater := rating.NewRaterWithStrokes(fateData, strokes[0], strokes[1])
+	rater.SetSurnamePinyin(surnamePinyin(req.LastName))
 	surname := surnameStr(req.LastName)
 
 	table := NewExcellentTable()
@@ -124,24 +136,24 @@ func (p *Pipeline) GenerateStream(ctx context.Context, req GenerateRequest, onBa
 		}
 	}
 
-	runScoringParallel(ctx, lucky, rater, table, poetrySet, chars, req.Filter, cb)
+	runScoringParallel(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req.Filter, cb)
 
 	// Fallback tiers if no results.
 	strictness := req.Filter.FilterStrictness()
 	if table.HeapLen() == 0 && strictness != "relaxed" {
 		req.Filter.SetFilterStrictness("moderate")
 		chars = preloadChars(ctx, p.db, lucky, req.Filter)
-		runScoringParallel(ctx, lucky, rater, table, poetrySet, chars, req.Filter, cb)
+		runScoringParallel(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req.Filter, cb)
 	}
 	if table.HeapLen() == 0 && strictness != "relaxed" {
 		req.Filter.SetFilterStrictness("relaxed")
 		chars = preloadChars(ctx, p.db, lucky, req.Filter)
-		runScoringParallel(ctx, lucky, rater, table, poetrySet, chars, req.Filter, cb)
+		runScoringParallel(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req.Filter, cb)
 	}
 
 	table.Finalize()
 	charMap := buildCharMap(chars)
-	result := p.buildResults(table, charMap, strokes, fateData, surname)
+	result := p.buildResults(table, charMap, strokes, fateData, surname, surnamePinyin(req.LastName))
 
 	onBatch(StreamBatch{
 		TopResults: result.TopNames,
@@ -180,28 +192,29 @@ func (p *Pipeline) runScoringWithFallback(
 	rater *rating.Rater,
 	table *ExcellentTable,
 	poetrySet map[string]bool,
+	pairBoost map[string]struct{},
 	chars map[int][]*ent.Character,
 	req GenerateRequest,
 ) (*ExcellentTable, map[int][]*ent.Character) {
-	runScoring(ctx, lucky, rater, table, poetrySet, chars, req.Filter)
+	runScoring(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req.Filter)
 
 	strictness := req.Filter.FilterStrictness()
 	if table.HeapLen() == 0 && strictness != "relaxed" {
 		req.Filter.SetFilterStrictness("moderate")
 		chars = preloadChars(ctx, p.db, lucky, req.Filter)
-		runScoring(ctx, lucky, rater, table, poetrySet, chars, req.Filter)
+		runScoring(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req.Filter)
 	}
 	if table.HeapLen() == 0 && strictness != "relaxed" {
 		req.Filter.SetFilterStrictness("relaxed")
 		chars = preloadChars(ctx, p.db, lucky, req.Filter)
-		runScoring(ctx, lucky, rater, table, poetrySet, chars, req.Filter)
+		runScoring(ctx, lucky, rater, table, poetrySet, pairBoost, chars, req.Filter)
 	}
 
 	return table, chars
 }
 
 // buildResults converts the final excellent table into public result types.
-func (p *Pipeline) buildResults(table *ExcellentTable, charMap map[string]*ent.Character, strokes [2]int, fateData *chronosfate.FateData, surname string) *GenerateResult {
+func (p *Pipeline) buildResults(table *ExcellentTable, charMap map[string]*ent.Character, strokes [2]int, fateData *chronosfate.FateData, surname string, surnamePinyin string) *GenerateResult {
 	topEntries := table.TopN(10)
 	topResults := make([]analysis.NameResult, 0, len(topEntries))
 	for i, e := range topEntries {
@@ -210,9 +223,12 @@ func (p *Pipeline) buildResults(table *ExcellentTable, charMap map[string]*ent.C
 		if c1 == nil || c2 == nil {
 			continue
 		}
-		nr := analysis.BuildNameResult(i+1, surname, c1, c2, strokes[0], strokes[1], fateData)
+		nr := analysis.BuildNameResult(i+1, surname, c1, c2, strokes[0], strokes[1], fateData, analysis.WithSurnamePinyin(surnamePinyin))
 		topResults = append(topResults, nr)
 	}
+
+	// Fill poetry sources for the top names (ROADMAP 1.3.3 PoetrySource).
+	p.fillPoetryOrigins(topResults)
 
 	return &GenerateResult{
 		TopNames:        topResults,
@@ -220,6 +236,49 @@ func (p *Pipeline) buildResults(table *ExcellentTable, charMap map[string]*ent.C
 		CharMap:         charMap,
 		FateData:        fateData,
 		LastNameStrokes: strokes,
+	}
+}
+
+// fillPoetryOrigins attaches the most authoritative poem source to each
+// character of the given results. Failures degrade silently.
+func (p *Pipeline) fillPoetryOrigins(results []analysis.NameResult) {
+	if len(results) == 0 {
+		return
+	}
+	ctx := context.Background()
+	origins := make(map[string]*analysis.PoetryOrigin, len(results)*2)
+	for i := range results {
+		for ci, char := range [2]string{results[i].Char1.Char, results[i].Char2.Char} {
+			if char == "" {
+				continue
+			}
+			origin, ok := origins[char]
+			if !ok {
+				hit, err := p.db.BestPoemOrigin(ctx, char)
+				if err != nil || hit == nil {
+					origins[char] = nil
+					continue
+				}
+				origin = &analysis.PoetryOrigin{
+					Title:    hit.Title,
+					Author:   hit.Author,
+					Dynasty:  hit.Dynasty,
+					Sentence: hit.Sentence,
+					Type:     hit.Type,
+				}
+				origins[char] = origin
+			}
+			if origin == nil {
+				continue
+			}
+			if ci == 0 {
+				results[i].Char1.PoetryOrigin = origin
+				results[i].Char1.HasPoetry = true
+			} else {
+				results[i].Char2.PoetryOrigin = origin
+				results[i].Char2.HasPoetry = true
+			}
+		}
 	}
 }
 
@@ -233,11 +292,11 @@ func heapPreview(table *ExcellentTable, n int, surname string, strokes [2]int) [
 	results := make([]analysis.NameResult, 0, len(entries))
 	for i, e := range entries {
 		results = append(results, analysis.NameResult{
-			Rank:     i + 1,
-			Surname:  surname,
-			FullName: surname + e.Char1 + e.Char2,
-			Score:    e.Score,
-			Grade:    e.Grade,
+			Rank:      i + 1,
+			Surname:   surname,
+			FullName:  surname + e.Char1 + e.Char2,
+			Score:     e.Score,
+			Grade:     e.Grade,
 			HasPoetry: e.HasPoetry,
 			Char1: analysis.CharInfo{
 				Char:      e.Char1,
@@ -269,6 +328,38 @@ func (p *Pipeline) queryPoetrySet(ctx context.Context) map[string]bool {
 	return poetrySet
 }
 
+// queryPairBoost loads a sampled set of same-sentence character pairs for the
+// candidate character pool. Pairs in this set receive a coherence bonus during
+// scoring (ROADMAP 1.3.3: "优先组合同句/同联的字对"). Returns nil when poetry
+// data is unavailable or disabled.
+func (p *Pipeline) queryPairBoost(ctx context.Context, chars map[int][]*ent.Character, poetrySet map[string]bool) map[string]struct{} {
+	if len(poetrySet) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, 4096)
+	pool := make([]string, 0, 4096)
+	for _, list := range chars {
+		for _, c := range list {
+			if c == nil || seen[c.Char] {
+				continue
+			}
+			seen[c.Char] = true
+			pool = append(pool, c.Char)
+		}
+	}
+	if len(pool) == 0 {
+		return nil
+	}
+	start := time.Now()
+	boost, err := p.db.PoemPairBoost(ctx, pool, 300000, 200000)
+	if err != nil {
+		log.Info("poetry pair boost unavailable", "reason", err.Error())
+		return nil
+	}
+	log.Info("poetry pair boost loaded", "pairs", len(boost), "elapsed", time.Since(start).String())
+	return boost
+}
+
 // surnameStr joins the surname character(s) into a string.
 func surnameStr(lastName [2]*ent.Character) string {
 	s := ""
@@ -279,6 +370,14 @@ func surnameStr(lastName [2]*ent.Character) string {
 		s += lastName[1].Char
 	}
 	return s
+}
+
+// surnamePinyin returns the first pinyin reading of the surname head character.
+func surnamePinyin(lastName [2]*ent.Character) string {
+	if lastName[0] != nil && len(lastName[0].Pinyin) > 0 {
+		return lastName[0].Pinyin[0]
+	}
+	return ""
 }
 
 // surnameStrokes computes surname stroke values using the active filter mode.

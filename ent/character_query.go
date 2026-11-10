@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -27,6 +28,7 @@ type CharacterQuery struct {
 	withVariantOf               *CharacterQuery
 	withStandardToVariant       *CharacterQuery
 	withFKs                     bool
+	modifiers                   []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -498,6 +500,9 @@ func (cq *CharacterQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ch
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(cq.modifiers) > 0 {
+		_spec.Modifiers = cq.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -665,6 +670,9 @@ func (cq *CharacterQuery) loadStandardToVariant(ctx context.Context, query *Char
 
 func (cq *CharacterQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := cq.querySpec()
+	if len(cq.modifiers) > 0 {
+		_spec.Modifiers = cq.modifiers
+	}
 	_spec.Node.Columns = cq.ctx.Fields
 	if len(cq.ctx.Fields) > 0 {
 		_spec.Unique = cq.ctx.Unique != nil && *cq.ctx.Unique
@@ -727,6 +735,9 @@ func (cq *CharacterQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	if cq.ctx.Unique != nil && *cq.ctx.Unique {
 		selector.Distinct()
 	}
+	for _, m := range cq.modifiers {
+		m(selector)
+	}
 	for _, p := range cq.predicates {
 		p(selector)
 	}
@@ -742,6 +753,32 @@ func (cq *CharacterQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// ForUpdate locks the selected rows against concurrent updates, and prevent them from being
+// updated, deleted or "selected ... for update" by other sessions, until the transaction is
+// either committed or rolled-back.
+func (cq *CharacterQuery) ForUpdate(opts ...sql.LockOption) *CharacterQuery {
+	if cq.driver.Dialect() == dialect.Postgres {
+		cq.Unique(false)
+	}
+	cq.modifiers = append(cq.modifiers, func(s *sql.Selector) {
+		s.ForUpdate(opts...)
+	})
+	return cq
+}
+
+// ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
+// on any rows that are read. Other sessions can read the rows, but cannot modify them
+// until your transaction commits.
+func (cq *CharacterQuery) ForShare(opts ...sql.LockOption) *CharacterQuery {
+	if cq.driver.Dialect() == dialect.Postgres {
+		cq.Unique(false)
+	}
+	cq.modifiers = append(cq.modifiers, func(s *sql.Selector) {
+		s.ForShare(opts...)
+	})
+	return cq
 }
 
 // CharacterGroupBy is the group-by builder for Character entities.

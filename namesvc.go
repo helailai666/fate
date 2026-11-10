@@ -25,7 +25,7 @@ type GenerateRequest struct {
 // GenerateResult is the output of synchronous name generation.
 type GenerateResult struct {
 	TopNames       []NameResult
-	ExcellentTable ExcellentTable
+	ExcellentTable *ExcellentTable
 	CharMap        map[string]CharInfo
 	FateData       *FateData
 }
@@ -69,14 +69,20 @@ func (f *fateImpl) Generate(ctx context.Context, req GenerateRequest) (*Generate
 
 	return &GenerateResult{
 		TopNames:       result.TopNames,
-		ExcellentTable: *result.ExcellentTable,
+		ExcellentTable: result.ExcellentTable,
 		CharMap:        charMap,
 		FateData:       result.FateData,
 	}, nil
 }
 
 // StreamBatch is delivered during streaming generation.
-type StreamBatch = namesvc.StreamBatch
+type StreamBatch struct {
+	TopResults []NameResult
+	Total      int
+	IsFinal    bool
+	// Result is set only on the final batch (IsFinal=true).
+	Result *GenerateResult
+}
 
 // GenerateStream runs the pipeline in parallel, sending batches of top results
 // via onBatch as workers complete. The last call always has IsFinal=true.
@@ -96,15 +102,32 @@ func (f *fateImpl) GenerateStream(ctx context.Context, req GenerateRequest, onBa
 
 	pipe := namesvc.NewPipeline(f.db)
 
-	// Wrap the public onBatch to convert internal StreamBatch to public type.
-	// Since StreamBatch is a type alias, no conversion is needed.
+	// Convert internal batches into public types.
 	return pipe.GenerateStream(ctx, namesvc.GenerateRequest{
 		LastName: lastName,
 		Born:     req.Born,
 		Sex:      naming.Sex(req.Sex),
 		Filter:   flt,
 	}, func(batch namesvc.StreamBatch) {
-		onBatch(batch)
+		var result *GenerateResult
+		if batch.Result != nil {
+			charMap := make(map[string]CharInfo, len(batch.Result.CharMap))
+			for ch, c := range batch.Result.CharMap {
+				charMap[ch] = charInfoFromCharacter(c)
+			}
+			result = &GenerateResult{
+				TopNames:       batch.Result.TopNames,
+				ExcellentTable: batch.Result.ExcellentTable,
+				CharMap:        charMap,
+				FateData:       batch.Result.FateData,
+			}
+		}
+		onBatch(StreamBatch{
+			TopResults: batch.TopResults,
+			Total:      batch.Total,
+			IsFinal:    batch.IsFinal,
+			Result:     result,
+		})
 	})
 }
 

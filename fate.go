@@ -1,4 +1,4 @@
-﻿package fate
+package fate
 
 import (
 	"context"
@@ -48,6 +48,11 @@ func New(cfg *config.Config) (Fate, error) {
 		return nil, err
 	}
 	repo := repository.New(client)
+	// Attach a raw SQL handle for poetry queries; poetry features degrade
+	// gracefully when unavailable.
+	if raw, err := database.RawDB(cfg.Database); err == nil {
+		repo.SetRawDB(raw)
+	}
 	return &fateImpl{
 		cfg: cfg,
 		db:  repo,

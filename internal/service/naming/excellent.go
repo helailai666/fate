@@ -20,14 +20,31 @@ type ExcellentEntry struct {
 	WuXing1   string  `json:"wu_xing1"`
 	WuXing2   string  `json:"wu_xing2"`
 	HasPoetry bool    `json:"has_poetry"`
+	// Semantic is the combined aesthetic (character meaning quality) score of
+	// the pair. Not serialized; used to break total-score ties so that
+	// beautiful names rank above vulgar ones with equal scores.
+	Semantic float64 `json:"-"`
+}
+
+// betterThan reports whether entry a should rank above entry b:
+// higher total score first, then higher semantic (aesthetic) score.
+func (e ExcellentEntry) betterThan(o ExcellentEntry) bool {
+	if e.Score != o.Score {
+		return e.Score > o.Score
+	}
+	return e.Semantic > o.Semantic
 }
 
 type excellentMinHeap []ExcellentEntry
 
-func (h excellentMinHeap) Len() int           { return len(h) }
-func (h excellentMinHeap) Less(i, j int) bool { return h[i].Score < h[j].Score }
-func (h excellentMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-func (h *excellentMinHeap) Push(x any)        { *h = append(*h, x.(ExcellentEntry)) }
+func (h excellentMinHeap) Len() int { return len(h) }
+func (h excellentMinHeap) Less(i, j int) bool {
+	// Min-heap: "less" entries are popped first, so invert betterThan —
+	// worse entries (lower score, then lower semantic) sit at the root.
+	return h[j].betterThan(h[i])
+}
+func (h excellentMinHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *excellentMinHeap) Push(x any)   { *h = append(*h, x.(ExcellentEntry)) }
 func (h *excellentMinHeap) Pop() any {
 	old := *h
 	n := len(old)
@@ -74,13 +91,14 @@ func (t *ExcellentTable) TryPush(entry ExcellentEntry) {
 		return
 	}
 
-	if entry.Score > t.h[0].Score {
+	if entry.betterThan(t.h[0]) {
 		heap.Pop(&t.h)
 		heap.Push(&t.h, entry)
 	}
 }
 
-// Finalize locks the table, sorts entries by score descending, and frees heap memory.
+// Finalize locks the table, sorts entries by (score, semantic) descending,
+// and frees heap memory.
 func (t *ExcellentTable) Finalize() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -88,7 +106,7 @@ func (t *ExcellentTable) Finalize() {
 	t.entries = make([]ExcellentEntry, len(t.h))
 	copy(t.entries, t.h)
 	sort.Slice(t.entries, func(i, j int) bool {
-		return t.entries[i].Score > t.entries[j].Score
+		return t.entries[i].betterThan(t.entries[j])
 	})
 	t.index = make(map[string]int, len(t.entries))
 	for i, e := range t.entries {

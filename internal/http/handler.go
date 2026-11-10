@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,7 +13,10 @@ import (
 
 	"github.com/babyname/fate/v4"
 	"github.com/babyname/fate/v4/ent"
+	"github.com/babyname/fate/v4/internal/analysis"
+	"github.com/babyname/fate/v4/internal/chronosfate"
 	"github.com/babyname/fate/v4/internal/repository"
+	chronos "github.com/godcong/chronos/v2"
 )
 
 type Handler struct {
@@ -49,14 +53,22 @@ type taskStore struct {
 }
 
 type generateRequest struct {
-	Surname       string `json:"surname"`
-	Born          string `json:"born"`
-	Sex           string `json:"sex"`
-	PoetryMode    int    `json:"poetry_mode"`
-	XiYongMethod  string `json:"xi_yong_method"`
-	AvoidChars    string `json:"avoid_chars"`
-	RequireChars  string `json:"require_chars"`
-	FilterType    int    `json:"filter_type"`
+	Surname      string   `json:"surname"`
+	Born         string   `json:"born"`
+	Sex          string   `json:"sex"`
+	PoetryMode   int      `json:"poetry_mode"`
+	XiYongMethod string   `json:"xiyong_method"`
+	AvoidChars   []string `json:"avoid_chars"`
+	RequireChars []string `json:"require_chars"`
+	FilterType   int      `json:"filter_type"`
+}
+
+type nameScoreRequest struct {
+	Surname string `json:"surname"`
+	Name1   string `json:"name1"`
+	Name2   string `json:"name2"`
+	Born    string `json:"born"`
+	Sex     string `json:"sex"`
 }
 
 // NewHandler creates an initialized Handler with all routes registered.
@@ -88,13 +100,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) registerRoutes() {
-	h.mux.HandleFunc("POST /api/v1/generate", h.handleGenerate)
-	h.mux.HandleFunc("GET /api/v1/status", h.handleStatus)
-	h.mux.HandleFunc("GET /api/v1/result", h.handleResult)
-	h.mux.HandleFunc("GET /api/v1/explore", h.handleExplore)
-	h.mux.HandleFunc("GET /api/v1/names", h.handleNames)
-	h.mux.HandleFunc("GET /api/v1/name_detail", h.handleNameDetail)
+	h.mux.HandleFunc("POST /api/generate", h.handleGenerate)
+	h.mux.HandleFunc("GET /api/generate/status", h.handleStatus)
+	h.mux.HandleFunc("GET /api/generate/result", h.handleResult)
+	h.mux.HandleFunc("GET /api/generate/names", h.handleNames)
+	h.mux.HandleFunc("GET /api/generate/explore", h.handleExplore)
+	h.mux.HandleFunc("GET /api/name-detail", h.handleNameDetail)
+	h.mux.HandleFunc("POST /api/name-score", h.handleNameScore)
+	h.mux.HandleFunc("GET /api/poetry/search", h.handlePoetrySearch)
 	h.mux.HandleFunc("GET /api/v1/characters", h.handleCharacters)
+	h.mux.HandleFunc("GET /health", h.handleHealth)
 	h.mux.HandleFunc("GET /", h.handleStatic)
 }
 
@@ -147,18 +162,10 @@ func (h *Handler) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		sex = fate.SexGirl
 	}
 
-	// Parse optional comma-separated char lists.
-	avoidChars := strings.Split(req.AvoidChars, ",")
-	requireChars := strings.Split(req.RequireChars, ",")
-	if len(avoidChars) == 1 && avoidChars[0] == "" {
-		avoidChars = nil
-	}
-	if len(requireChars) == 1 && requireChars[0] == "" {
-		requireChars = nil
-	}
-
-	// Generate synchronously.
-	result, err := h.fate.Generate(r.Context(), fate.GenerateRequest{
+	// Generate via the streaming pipeline so scoring runs in parallel across
+	// CPU cores; the final batch carries the complete result.
+	var result *fate.GenerateResult
+	err = h.fate.GenerateStream(r.Context(), fate.GenerateRequest{
 		LastName: req.Surname,
 		Born:     born,
 		Sex:      sex,
@@ -168,13 +175,21 @@ func (h *Handler) handleGenerate(w http.ResponseWriter, r *http.Request) {
 			WuXingFilter:        true,
 			PoetryMode:          req.PoetryMode,
 			XiYongMethod:        req.XiYongMethod,
-			AvoidCharacters:     avoidChars,
-			RequireCharacters:   requireChars,
+			AvoidCharacters:     req.AvoidChars,
+			RequireCharacters:   req.RequireChars,
 			CharacterFilterType: fate.CharacterFilterType(req.FilterType),
 		},
+	}, func(batch fate.StreamBatch) {
+		if batch.IsFinal {
+			result = batch.Result
+		}
 	})
 	if err != nil {
 		writeError(w, 500, "failed to generate: "+err.Error())
+		return
+	}
+	if result == nil {
+		writeError(w, 500, "failed to generate: no result")
 		return
 	}
 
@@ -209,6 +224,205 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"task_id": taskID,
 		"state":   "done",
+	})
+}
+
+func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]any{"status": "ok"})
+}
+
+// handleNameScore scores an existing name (surname + two given-name chars).
+func (h *Handler) handleNameScore(w http.ResponseWriter, r *http.Request) {
+	var req nameScoreRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "invalid request body")
+		return
+	}
+	if req.Surname == "" || req.Name1 == "" || req.Name2 == "" {
+		writeError(w, 400, "surname, name1 and name2 are required")
+		return
+	}
+
+	born := time.Now()
+	if req.Born != "" {
+		var err error
+		for _, layout := range []string{
+			"2006-01-02T15:04", "2006-01-02T15:04:05",
+			"2006/01/02 15:04", "2006-01-02 15:04",
+			"2006/01/02", "2006-01-02",
+		} {
+			born, err = time.Parse(layout, req.Born)
+			if err == nil {
+				break
+			}
+		}
+		if err != nil {
+			writeError(w, 400, "invalid born date format")
+			return
+		}
+	}
+
+	sex := fate.SexBoy
+	if req.Sex == "2" || req.Sex == "girl" {
+		sex = fate.SexGirl
+	}
+
+	ctx := r.Context()
+
+	lookup := func(name string) (*ent.Character, error) {
+		c, err := h.repo.GetCharacter(ctx, repository.Char(name))
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+
+	// Surname may be one or two characters (compound surname).
+	surnameRunes := []rune(req.Surname)
+	surnameChars := make([]*ent.Character, 0, len(surnameRunes))
+	for _, sr := range surnameRunes {
+		c, err := lookup(string(sr))
+		if err != nil {
+			if ent.IsNotFound(err) {
+				writeError(w, 404, "character not found: "+string(sr))
+				return
+			}
+			writeError(w, 500, "query failed: "+err.Error())
+			return
+		}
+		surnameChars = append(surnameChars, c)
+	}
+
+	c1, err := lookup(req.Name1)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			writeError(w, 404, "character not found: "+req.Name1)
+			return
+		}
+		writeError(w, 500, "query failed: "+err.Error())
+		return
+	}
+
+	c2, err := lookup(req.Name2)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			writeError(w, 404, "character not found: "+req.Name2)
+			return
+		}
+		writeError(w, 500, "query failed: "+err.Error())
+		return
+	}
+
+	// Surname strokes (science stroke, same as the default filter mode).
+	l1 := surnameChars[0].ScienceStroke
+	l2 := 0
+	if len(surnameChars) > 1 {
+		l2 = surnameChars[1].ScienceStroke
+	}
+
+	fateData, err := chronosfate.GetFateData(chronosfate.FateInput{
+		Calendar:     chronos.NewSolarCalendar(born),
+		Gender:       int(sex),
+		XiYongMethod: chronosfate.XiYongMethodBalance,
+	})
+	if err != nil {
+		fateData = nil
+	}
+
+	nr := analysis.BuildNameResult(0, req.Surname, c1, c2, l1, l2, fateData,
+		analysis.WithSurnamePinyin(surnamePinyinOf(surnameChars[0])))
+
+	// Attach poetry sources when available.
+	for _, ci := range []*ent.Character{c1, c2} {
+		hit, err := h.repo.BestPoemOrigin(ctx, ci.Char)
+		if err != nil || hit == nil {
+			continue
+		}
+		origin := &analysis.PoetryOrigin{
+			Title:    hit.Title,
+			Author:   hit.Author,
+			Dynasty:  hit.Dynasty,
+			Sentence: hit.Sentence,
+			Type:     hit.Type,
+		}
+		if ci.Char == c1.Char {
+			nr.Char1.PoetryOrigin = origin
+			nr.Char1.HasPoetry = true
+		}
+		if ci.Char == c2.Char {
+			nr.Char2.PoetryOrigin = origin
+			nr.Char2.HasPoetry = true
+		}
+	}
+
+	writeJSON(w, 200, map[string]any{"name_result": nr})
+}
+
+// surnamePinyinOf returns the first pinyin reading of a character.
+func surnamePinyinOf(c *ent.Character) string {
+	if c != nil && len(c.Pinyin) > 0 {
+		return c.Pinyin[0]
+	}
+	return ""
+}
+
+// handlePoetrySearch searches poetry by keyword (single char or text) with
+// optional author/dynasty/type filters. Degrades gracefully with an empty
+// result set when the poetry dataset has not been imported (see data/README.md).
+func (h *Handler) handlePoetrySearch(w http.ResponseWriter, r *http.Request) {
+	keyword := r.URL.Query().Get("keyword")
+	if keyword == "" {
+		keyword = r.URL.Query().Get("char")
+	}
+	if keyword == "" {
+		writeError(w, 400, "keyword is required")
+		return
+	}
+
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		fmt.Sscanf(p, "%d", &page)
+		if page < 1 {
+			page = 1
+		}
+	}
+	size := 20
+	if s := r.URL.Query().Get("size"); s != "" {
+		fmt.Sscanf(s, "%d", &size)
+		if size <= 0 || size > 100 {
+			size = 20
+		}
+	}
+
+	author := r.URL.Query().Get("author")
+	dynasty := r.URL.Query().Get("dynasty")
+	ptype := r.URL.Query().Get("type")
+
+	hits, total, err := h.repo.SearchPoems(r.Context(), keyword, author, dynasty, ptype, page, size)
+	if err != nil {
+		if errors.Is(err, repository.ErrPoetryUnavailable) {
+			writeJSON(w, 200, map[string]any{
+				"results":          []any{},
+				"total":            0,
+				"page":             page,
+				"size":             size,
+				"poetry_available": false,
+			})
+			return
+		}
+		writeError(w, 500, "search failed: "+err.Error())
+		return
+	}
+
+	if hits == nil {
+		hits = []repository.PoemCharHit{}
+	}
+	writeJSON(w, 200, map[string]any{
+		"results":          hits,
+		"total":            total,
+		"page":             page,
+		"size":             size,
+		"poetry_available": true,
 	})
 }
 
@@ -447,7 +661,7 @@ func (h *Handler) handleStatic(w http.ResponseWriter, r *http.Request) {
 	if h.staticFS == nil {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(200)
-		_, _ = w.Write([]byte("Fate API Server\n\nAvailable endpoints:\n  POST /api/v1/generate\n  GET  /api/v1/status\n  GET  /api/v1/result\n  GET  /api/v1/explore\n  GET  /api/v1/characters\n"))
+		_, _ = w.Write([]byte("Fate API Server\n\nAvailable endpoints:\n  POST /api/generate\n  GET  /api/generate/status\n  GET  /api/generate/result\n  GET  /api/generate/names\n  GET  /api/generate/explore\n  GET  /api/name-detail\n  POST /api/name-score\n  GET  /api/poetry/search\n  GET  /api/v1/characters\n  GET  /health\n"))
 		return
 	}
 
