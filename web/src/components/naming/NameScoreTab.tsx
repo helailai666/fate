@@ -21,7 +21,7 @@ export function NameScoreTab() {
   const setDetailModalOpen = useAppStore((s) => s.setDetailModalOpen);
 
   const handleScore = async () => {
-    if (!surname || !name1 || !name2) {
+    if (!surname || !name1 ) {
       setError('请输入完整的姓名');
       return;
     }
